@@ -205,3 +205,20 @@ Proof.
   apply initial_trans_invariant in ini.
   apply (trans_star_trans_invariant ini star).
 Qed.
+
+(* 初期状態から任意の遷移を任意回行っても名前は重複しない *)
+Theorem initial_trans_star_no_dup :
+  forall config msgs actors,
+    initial_config config ->
+    trans_star config (conf msgs actors) ->
+    no_dup actors.
+Proof.
+  intros config msgs actors ini star.
+  assert (trans_invariant_config (conf msgs actors)).
+  - apply initial_trans_star_trans_invariant with (conf := config) (conf' := (conf msgs actors)); auto.
+  - unfold trans_invariant_config in H.
+    unfold trans_invariant in H.
+    destruct H as [ ch H ].
+    destruct H as [ fr no ].
+    auto.
+Qed.
