@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import String List Relations.
+Require Import String List.
 Import ListNotations.
 
 Require Import syntax.
