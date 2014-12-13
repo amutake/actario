@@ -13,23 +13,81 @@ Inductive name : Set :=
 | toplevel : machine_addr -> name
 | generated : name -> gen_number -> name. (* ユーザーに generated というコンストラクタを使わせたくないのだけどできる？ *)
 
-Inductive message : Type := wrap : forall A : Set, A -> message. (* put in an envelop *)
+(* 任意の Set をメッセージとして送ることができるようにするなら、message と name と actor に型タグ付けないといけない (と思う) *)
+(* Inductive message (A : Set) : Set := wrap : A -> message A. みたいに。じゃないとパターンマッチできない *)
+Inductive message : Set :=
+| empty_msg : message
+| name_msg : name -> message
+| str_msg : string -> message
+| nat_msg : nat -> message
+| bool_msg : bool -> message
+| tuple_msg : message -> message -> message.
 
-Inductive action : Type :=
-| new : behavior -> (name -> list action) -> action (* 継続渡し。ユーザーが生成する名前を直接指定できないようにする *)
-| send : name -> message -> action
-| become : behavior -> action (* これはシンタックスということを忘れない！！ *)
+(* Behavior は自分を指定することがよくあるので、Inductive だと再帰が書けなくなるので、CoInductive にしている *)
+CoInductive action : Type :=
+| new : behavior -> (name -> action) -> action (* CPS *)
+| send : name -> message -> action -> action   (* send n m a == n ! m;; a *)
+| self : (name -> action) -> action            (* CPS *)
+| become : behavior -> action                  (* become した後はアクションを取れない。become 以外は後に action が続かなければならないので、最後は必ず become になる *)
 with behavior : Type :=
-| beh : (message -> list action) -> behavior.
+| beh : (message -> action) -> behavior.
+
+Notation "n '<-' 'new' behv ; cont" := (new behv (fun n => cont)) (at level 0, cont at level 10).
+Notation "n '!' m ';' a" := (send n m a) (at level 0, a at level 10).
+Notation "me '<-' 'self' ';' cont" := (self (fun me => cont)) (at level 0, cont at level 10).
 
 Inductive sending : Type := send_message : name -> message -> sending.
 
 Inductive actor : Type :=
-| actor_state : name -> list action -> behavior -> gen_number -> actor.
+| actor_state : name -> action -> behavior -> gen_number -> actor.
 
 Inductive config : Type :=
 | conf : list sending -> list actor -> config.
 
+(* メッセージを受け取っても何もしない振る舞い *)
+CoFixpoint empty_behv : behavior := beh (fun _ => become empty_behv).
+
+Definition init (sys_name : string) (actions : action) : config :=
+  conf [] [ actor_state (toplevel sys_name) actions empty_behv 0 ].
+
+(* Examples *)
+Module NotationExamples.
+
+  (* Notation のテスト *)
+  Definition notation_test_behv : behavior :=
+    beh (fun _ =>
+           server <- new empty_behv;
+           me <- self;
+           server ! name_msg me;
+           become empty_behv).
+
+  (* 受け取ったメッセージを送ってきたアクターにそのまま返す *)
+  CoFixpoint echo_server_behavior : behavior :=
+    beh (fun msg =>
+           match msg with
+             | tuple_msg (name_msg sender) content =>
+               sender ! content; become echo_server_behavior
+             | _ => become echo_server_behavior
+           end).
+
+  (* サーバに Hello! というメッセージを送り続ける *)
+  (* echo_server に送ったとき、ちゃんと Hello! が返ってきたことを確かめるには？ *)
+  CoFixpoint echo_client_behavior (server : name) : behavior :=
+    beh (fun _ =>
+           me <- self;
+           server ! (tuple_msg (name_msg me) (str_msg "Hello!"));
+           become (echo_client_behavior server)
+        ).
+
+  Definition echo_init_system : config :=
+    init "echo-system" (server <- new echo_server_behavior; (* サーバーを作る *)
+                        client <- new (echo_client_behavior server); (* クライアントを作る *)
+                        client ! empty_msg; (* クライアントを走らせる *)
+                        become empty_behv). (* それ以降は何もしない *)
+
+  Print echo_init_system.
+
+End NotationExamples.
 
 Module Getter.
 
