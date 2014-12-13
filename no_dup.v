@@ -11,6 +11,16 @@ Definition no_dup (actors : list actor) : Prop := NoDup (map G.n actors).
 
 Hint Constructors NoDup.
 
+Lemma no_dup_related_only_name :
+  forall actors actors',
+    map G.n actors = map G.n actors' ->
+    no_dup actors ->
+    no_dup actors'.
+Proof.
+  unfold no_dup.
+  intros actors actors' name_eq no.
+  rewrite <- name_eq; auto.
+Qed.
 
 (* 仮定が gen_fresh だけだと成り立たない。
  * [ (((A, 0), 0) * 0) ; (A * 0) ] は gen_fresh だけど、
@@ -38,7 +48,7 @@ Proof.
   (* 2. chain の補題「子がいないなら孫もいない」(no_child_no_grandchild) もしくは「いないやつの子はいない」(no_actor_no_child) を使う??? *)
   (* 3. no_dup の条件を使う *)
   - apply gen_fresh_increase in fr.
-    eapply gen_fresh_only_name_gen with (actors := actors_l ++ actor_state addr (new behv cont) queue (S number) :: actors_r); auto.
+    eapply gen_fresh_related_only_name_number with (actors := actors_l ++ actor_state addr (new behv cont) queue (S number) :: actors_r); auto.
     repeat (rewrite map_app); auto.
   - intros yet le.
     rewrite map_app.

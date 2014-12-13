@@ -520,10 +520,11 @@ Proof.
       apply IHactors; auto.
 Qed.
 
-Lemma gen_fresh_only_name_gen : forall actors actors',
-                            map G.ns actors = map G.ns actors' ->
-                            gen_fresh actors ->
-                            gen_fresh actors'.
+Lemma gen_fresh_related_only_name_number :
+  forall actors actors',
+    map G.ns actors = map G.ns actors' ->
+    gen_fresh actors ->
+    gen_fresh actors'.
 Proof.
   intros actors actors'.
   revert actors.

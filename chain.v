@@ -265,3 +265,82 @@ Proof.
         }
         auto.
 Qed.
+
+Lemma chain_map_name_1 :
+  forall actors,
+    chain actors -> Forall (fun n => match n with
+                                       | toplevel _ => True
+                                       | generated p _ => In p (map G.n actors)
+                                     end) (map G.n actors).
+Proof.
+  intros actors ch.
+  unfold chain in *.
+  unfold G.pprop in *.
+
+  (* induction actors as [ | h t ]; simpl; auto. *)
+  (* induction ch as [ | h t Hh ch IH ]; simpl; auto. *)
+  inversion ch as [ emp | h t Hh Ht as_eq ]; simpl; auto; subst.
+  simpl in *.
+
+  destruct h as [ n a q s ].
+  destruct n as [ | p g ]; simpl in *.
+
+  apply Forall_cons_iff.
+Admitted.
+
+Lemma In_name :
+  forall actor actors,
+    In actor actors -> In (G.n actor) (map G.n actors).
+Proof.
+  intros actor actors ina.
+  induction actors; simpl; auto.
+  simpl in ina.
+  destruct ina as [ ina | ina ]; [ left; subst; auto | ].
+  right; apply IHactors; auto.
+Qed.
+
+Lemma chain_map_name_2 :
+  forall actors,
+    Forall (fun n => match n with
+                       | toplevel _ => True
+                       | generated p _ => In p (map G.n actors)
+                     end) (map G.n actors) ->
+    chain actors.
+Proof.
+  intros actors all.
+  unfold chain.
+  unfold G.pprop.
+
+  apply Forall_forall.
+  intros a ina.
+  destruct a as [ n a q s ].
+  destruct n as [ | p g ]; auto.
+
+  eapply Forall_forall in all.
+  - instantiate (1 := (generated p g)) in all.
+    simpl in all; auto.
+  - apply In_name in ina.
+    simpl in ina; auto.
+Qed.
+
+Lemma chain_map_name_iff :
+  forall actors,
+    chain actors <-> Forall (fun n => match n with
+                                        | toplevel _ => True
+                                        | generated p _ => In p (map G.n actors)
+                                      end) (map G.n actors).
+Proof.
+  split; [ apply chain_map_name_1 | apply chain_map_name_2 ].
+Qed.
+
+Lemma chain_related_only_name :
+  forall actors actors',
+    map G.n actors = map G.n actors' ->
+    chain actors ->
+    chain actors'.
+Proof.
+  intros actors actors' name_eq ch.
+  apply chain_map_name_iff.
+  apply chain_map_name_iff in ch.
+  rewrite name_eq in ch; auto.
+Qed.

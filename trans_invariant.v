@@ -16,63 +16,49 @@ Definition trans_invariant_config (conf : config) :=
 
 Hint Unfold trans_invariant trans_invariant_config.
 
-(* ___trans_trans_invariant *)
-(* dispatch, send, become はほとんど同じ (apply gen_fresh_only_name_gen のところだけ違う) なので、まとめたい *)
-
-Lemma dispatch_trans_trans_invariant :
-  forall msgs msgs' actors actors',
+Lemma trans_invariant_related_only_name_number :
+  forall actors actors',
+    map G.ns actors = map G.ns actors' ->
     trans_invariant actors ->
-    trans Dispatch (conf msgs actors) (conf msgs' actors') ->
     trans_invariant actors'.
 Proof.
-  intros msgs msgs' actors actors' inv tr.
-  inversion tr; subst.
-  inversion H2; subst.
-  clear tr H2.
-  destruct inv as [ ch inv ]; destruct inv as [ fr no ].
+  intros actors actors' ns_eq inv.
+  destruct inv as [ ch inv ].
+  destruct inv as [ fr no ].
   repeat split.
-  - unfold chain in *.
-    rewrite map_app in *.
-    simpl in *.
-    apply Forall_app_iff in ch; destruct ch as [ ch_l ch ];
-    apply Forall_cons_iff in ch; destruct ch as [ ch_m ch_r ].
-    apply Forall_app_iff; split; auto.
-  - apply gen_fresh_only_name_gen with (actors_l ++ actor_state addr [] behv number :: actors_r).
-    + repeat (rewrite map_app); auto.
-    + auto.
-  - unfold no_dup in *.
-    rewrite map_app.
-    simpl.
-    rewrite map_app in no.
-    simpl in no; auto.
+  - apply nss_eq_ns in ns_eq.
+    apply chain_related_only_name in ns_eq; auto.
+  - apply gen_fresh_related_only_name_number in ns_eq; auto.
+  - apply nss_eq_ns in ns_eq.
+    apply no_dup_related_only_name in ns_eq; auto.
 Qed.
 
-Lemma send_trans_trans_invariant :
-  forall msgs msgs' actors actors',
+Lemma not_new_trans_not_modify_name_number :
+  forall tr_type msgs msgs' actors actors',
+    tr_type <> New ->
+    trans tr_type (conf msgs actors) (conf msgs' actors') ->
+    map G.ns actors = map G.ns actors'.
+Proof.
+  intros tr_type msgs msgs' actors actors' neq tr.
+  destruct tr_type; try (exfalso; apply neq; reflexivity); clear neq;
+  inversion tr; subst;
+  repeat (rewrite map_app; simpl; idtac);
+  auto.
+Qed.
+
+Lemma not_new_trans_trans_invariant :
+  forall tr_type msgs msgs' actors actors',
+    tr_type <> New ->
     trans_invariant actors ->
-    trans Send (conf msgs actors) (conf msgs' actors') ->
+    trans tr_type (conf msgs actors) (conf msgs' actors') ->
     trans_invariant actors'.
 Proof.
-  intros msgs msgs' actors actors' inv tr.
-  inversion tr; subst.
-  inversion H2; subst.
-  clear tr H2.
-  destruct inv as [ ch inv ]; destruct inv as [ fr no ].
-  repeat split.
-  - unfold chain in *.
-    rewrite map_app in *.
-    simpl in *.
-    apply Forall_app_iff in ch; destruct ch as [ ch_l ch ];
-    apply Forall_cons_iff in ch; destruct ch as [ ch_m ch_r ].
-    apply Forall_app_iff; split; auto.
-  - apply gen_fresh_only_name_gen with (actors_l ++ actor_state addr' (send addr content :: actions) behv number :: actors_r).
-    + repeat (rewrite map_app); auto.
-    + auto.
-  - unfold no_dup in *.
-    rewrite map_app.
-    simpl.
-    rewrite map_app in no.
-    simpl in no; auto.
+  intros tr_type msgs msgs' actors actors' neq inv tr.
+  eapply trans_invariant_related_only_name_number.
+  - eapply not_new_trans_not_modify_name_number.
+    + apply neq.
+    + apply tr.
+  - apply inv.
 Qed.
 
 Lemma new_trans_trans_invariant :
@@ -95,39 +81,11 @@ Proof.
     + apply tr.
 Qed.
 
-Lemma become_trans_trans_invariant :
-  forall msgs msgs' actors actors',
-    trans_invariant actors ->
-    trans Become (conf msgs actors) (conf msgs' actors') ->
-    trans_invariant actors'.
+Lemma trans_type_dec : forall t1 t2 : trans_type, { t1 = t2 } + { t1 <> t2 }.
 Proof.
-  intros msgs msgs' actors actors' inv tr.
-  inversion tr; subst.
-  inversion H2; subst.
-  clear tr H2.
-  destruct inv as [ ch inv ]; destruct inv as [ fr no ].
-  repeat split.
-  - unfold chain in *.
-    rewrite map_app in *.
-    simpl in *.
-    apply Forall_app_iff in ch; destruct ch as [ ch_l ch ];
-    apply Forall_cons_iff in ch; destruct ch as [ ch_m ch_r ].
-    apply Forall_app_iff; split; auto.
-  - apply gen_fresh_only_name_gen with (actors_l ++ actor_state addr (become new_beh :: actions) old_beh number :: actors_r).
-    + repeat (rewrite map_app); auto.
-    + auto.
-  - unfold no_dup in *.
-    rewrite map_app.
-    simpl.
-    rewrite map_app in no.
-    simpl in no; auto.
+  intros t1 t2.
+  destruct t1, t2; try (left; reflexivity); try (right; intro H; easy).
 Qed.
-
-Hint Resolve
-     dispatch_trans_trans_invariant
-     send_trans_trans_invariant
-     new_trans_trans_invariant
-     become_trans_trans_invariant.
 
 Theorem trans_trans_invariant :
   forall typ msgs msgs' actors actors',
@@ -136,11 +94,10 @@ Theorem trans_trans_invariant :
     trans_invariant actors'.
 Proof.
   intros typ msgs msgs' actors actors' inv tr.
-  destruct typ.
-  - apply dispatch_trans_trans_invariant in tr; auto.
-  - apply send_trans_trans_invariant in tr; auto.
-  - apply new_trans_trans_invariant in tr; auto.
-  - apply become_trans_trans_invariant in tr; auto.
+  destruct (trans_type_dec typ New).
+  - subst.
+    apply new_trans_trans_invariant in tr; auto.
+  - apply not_new_trans_trans_invariant in tr; auto.
 Qed.
 
 Hint Resolve trans_trans_invariant.
