@@ -40,13 +40,12 @@ Definition factorial_system (n : nat) : config :=
          become empty_behv
        ).
 
-(* OK 状態にくることを検証したいのだけど、どうやればいいのか *)
-
-(* toplevel 使って名前を指定するところが微妙 *)
+Recursive Extraction factorial_system.
 
 Open Scope string_scope.
 
-(* (factorial_system 0) から、任意の遷移をした後、(toplevel "factorial") に向けて (nat_msg 1) というメッセージが送られる遷移が存在する *)
+(* (factorial_system 0) から、(toplevel "factorial") に向けて (nat_msg 1) というメッセージが送られる遷移とそこまでの遷移列が存在する *)
+(* toplevel 使って名前を指定するところが微妙 *)
 Theorem deliver_1 :
   deliver_exists (factorial_system 0) (toplevel "factorial") (nat_msg 1).
 Proof.
