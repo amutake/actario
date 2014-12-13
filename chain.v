@@ -13,16 +13,6 @@ Definition chain (actors : list actor) : Prop :=
 
 Hint Unfold chain.
 
-(* chain の弱いバージョン (過去に親がいる。未来の親は知らない) *)
-(* いらない？ *)
-Inductive weak_chain : list actor -> Prop :=
-| weak_chain_nil : weak_chain []
-| weak_chain_cons : forall actor actors,
-                      G.pprop actor (fun parent => In parent (map G.n actors)) ->
-                      weak_chain (actor :: actors).
-
-Hint Constructors weak_chain.
-
 Lemma new_trans_parent_exists :
   forall msgs msgs' actors new_actor actors',
     trans New (conf msgs actors) (conf msgs' (new_actor :: actors')) ->
@@ -33,8 +23,7 @@ Proof.
   simpl.
 
   inversion tr; subst.
-  inversion H2; subst.
-  clear tr H2.
+  clear tr.
   rewrite map_app.
   apply in_app_iff.
   right; simpl; left; auto.
@@ -109,7 +98,6 @@ Proof.
   apply Forall_cons_iff.
   split; auto.
 
-  inversion H2; subst; simpl in *.
   unfold chain in ch.
   apply Forall_app_iff in ch.
   destruct ch as [ ch_l ch' ].
@@ -118,15 +106,14 @@ Proof.
   simpl in ch_m.
 
   apply Forall_app_iff.
-  rewrite map_app in *.
-  simpl in *.
+  repeat (rewrite map_app in *; simpl in *; idtac).
 
   split.
   - apply Forall_pprop_or_r; auto.
   - apply Forall_cons_iff.
     split.
     + simpl.
-      destruct parent; auto.
+      destruct addr; auto.
     + apply Forall_pprop_or_r; auto.
 Qed.
 
