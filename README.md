@@ -22,7 +22,7 @@ $ make install
 Examples
 --------
 
-See `examples` directory.
+See [`examples`](./examples) directory.
 
 
 Current status
