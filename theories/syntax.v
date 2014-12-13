@@ -94,43 +94,6 @@ Proof.
   auto.
 Qed.
 
-(* Examples *)
-Module NotationExamples.
-
-  (* Notation のテスト *)
-  Definition notation_test_behv : behavior :=
-    beh (fun _ =>
-           server <- new empty_behv;
-           me <- self;
-           server ! name_msg me;
-           become empty_behv).
-
-  (* 受け取ったメッセージを送ってきたアクターにそのまま返す *)
-  CoFixpoint echo_server_behavior : behavior :=
-    beh (fun msg =>
-           match msg with
-             | tuple_msg (name_msg sender) content =>
-               sender ! content; become echo_server_behavior
-             | _ => become echo_server_behavior
-           end).
-
-  (* サーバに Hello! というメッセージを送り続ける *)
-  (* echo_server に送ったとき、ちゃんと Hello! が返ってきたことを確かめるには？ *)
-  CoFixpoint echo_client_behavior (server : name) : behavior :=
-    beh (fun _ =>
-           me <- self;
-           server ! (tuple_msg (name_msg me) (str_msg "Hello!"));
-           become (echo_client_behavior server)
-        ).
-
-  Definition echo_init_system : config :=
-    init "echo-system" (server <- new echo_server_behavior; (* サーバーを作る *)
-                        client <- new (echo_client_behavior server); (* クライアントを作る *)
-                        client ! empty_msg; (* クライアントを走らせる *)
-                        become empty_behv). (* それ以降は何もしない *)
-
-End NotationExamples.
-
 Module Getter.
 
   (* Parent name *)
