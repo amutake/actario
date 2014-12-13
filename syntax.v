@@ -35,18 +35,30 @@ Inductive message : Set :=
 | bool_msg : bool -> message
 | tuple_msg : message -> message -> message.
 
-(* Behavior は自分を指定することがよくあるので、Inductive だと再帰が書けなくなるので、CoInductive にしている *)
+(* behavior は become で自分を指定することがよくあり、Inductive だとそのような再帰が書けなくなるので、CoInductive にしている *)
+(* CoInductive なので、無限ループが書けちゃう *)
+(* Inductive actions, CoInductive behavior な気がするけど、相互(余)帰納型でそういうのって書ける(正しい)の？ *)
+(* CoFixpoint actions_example : actions :=
+ *   let behv := beh (fun _ => actions_example) in
+ *   become behv
+ * とかするから、actions も CoInductive で良さそう
+ *)
 CoInductive actions : Type :=
 | new : behavior -> (name -> actions) -> actions (* CPS *)
 | send : name -> message -> actions -> actions   (* send n m a == n ! m;; a *)
 | self : (name -> actions) -> actions            (* CPS *)
-| become : behavior -> actions                  (* become した後はアクションを取れない。become 以外は後に actions が続かなければならないので、最後は必ず become になる *)
+| become : behavior -> actions                   (* become した後はアクションを取れない。become 以外は後に actions が続かなければならないので、次のメッセージを受け取れる状態になれば必ず become になる *)
 with behavior : Type :=
 | beh : (message -> actions) -> behavior.
 
 Notation "n '<-' 'new' behv ; cont" := (new behv (fun n => cont)) (at level 0, cont at level 10).
 Notation "n '!' m ';' a" := (send n m a) (at level 0, a at level 10).
 Notation "me '<-' 'self' ';' cont" := (self (fun me => cont)) (at level 0, cont at level 10).
+
+(* Lemma "アクションに終わりがあるなら、アクションの最後は become しか来ない"
+ * CoInductive なので action := send name msg action みたいなのが書けるから自明ではないんだけど、これ証明できるの？
+ * become = "ある振る舞いでもって、次のメッセージの待ち状態になる" という意味だからいいのか
+ *)
 
 Inductive sending : Type := send_message : name -> message -> sending.
 
@@ -56,7 +68,7 @@ Inductive actor : Type :=
 (* あと、グローバルメッセージキューの他に actor もメッセージキューを持つようにしたい。グローバルキューだけだと、先頭のメッセージの宛先のアクターがいつまでたっても仕事が終わらないとき、他のアクターはメッセージを受け取れない *)
 
 Inductive config : Type :=
-| conf : list sending -> list actor -> config.
+| conf : list sending -> list actor -> config. (* config が list sending を持つメリットはある？External Actor への送信とか？ *)
 
 (* メッセージを受け取っても何もしない振る舞い *)
 CoFixpoint empty_behv : behavior := beh (fun _ => become empty_behv).
@@ -116,8 +128,6 @@ Module NotationExamples.
                         client <- new (echo_client_behavior server); (* クライアントを作る *)
                         client ! empty_msg; (* クライアントを走らせる *)
                         become empty_behv). (* それ以降は何もしない *)
-
-  Print echo_init_system.
 
 End NotationExamples.
 

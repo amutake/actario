@@ -6,65 +6,78 @@ Import ListNotations.
 
 Require Import syntax.
 
-Definition interp (m : message) (b : behavior) : list action :=
+Definition interp (m : message) (b : behavior) : actions :=
   match b with
     | beh f => f m
   end.
 
-(* External Actor へのメッセージだったら???? (現状では configuration に宛先がいない場合はそこで遷移できなくなる) *)
-(* アトミックではない (新しいメッセージと新しいアクターと新しい振る舞いを返すようにする？) *)
-(* メッセージは必ず送信順に受け取られる？ *)
-Inductive dispatch : sending -> list actor -> list actor -> Prop :=
-| dispatch_in : forall addr content actions behv number actors_l actors_r,
-                  interp content behv = actions ->
-                  dispatch (send_message addr content)
-                           (actors_l ++ actor_state addr [] behv number :: actors_r)
-                           (actors_l ++ actor_state addr actions behv number :: actors_r).
-
-(* send_action msg actors actors': actors が msg を送って actors' になる *)
-Inductive send_action : sending -> list actor -> list actor -> Prop :=
-| send_action_in : forall addr content addr' actions behv number actors_l actors_r,
-                     send_action (send_message addr content)
-                                 (actors_l ++ actor_state addr' (send addr content :: actions) behv number :: actors_r)
-                                 (actors_l ++ actor_state addr' actions behv number :: actors_r).
-
-(* new_action actor actors actors': actors が actor を生成して actors' になる *)
-(* 新しく生成されたアクターは actors' の中に含まれない *)
-Inductive new_action : actor -> list actor -> list actor -> Prop := (* new_action : list actor -> list actor -> Prop ??? *)
-| new_action_in : forall new_beh cont parent actions behv number actors_l actors_r,
-                    new_action (actor_state (generated parent number) [] new_beh 0)
-                               (actors_l ++ actor_state parent (new new_beh cont :: actions) behv number :: actors_r)
-                               (actors_l ++ actor_state parent (cont (generated parent number) ++ actions) behv (S number) :: actors_r).
-
-(* new_become actors actors': actors のなかのどれかが become アクションを実行して actors' になる *)
-Inductive become_action : list actor -> list actor -> Prop :=
-| become_action_in : forall new_beh old_beh addr actions number actors_l actors_r,
-                       become_action (actors_l ++ actor_state addr (become new_beh :: actions) old_beh number :: actors_r)
-                                     (actors_l ++ actor_state addr actions new_beh number :: actors_r).
-
-Inductive trans_type := Dispatch | Send | New | Become.
+Inductive trans_type := Deliver | Open | Send | New | Self.
 
 (* relation config *)
-(* trans conf conf': conf が遷移して conf' になる *)
+(* trans type conf conf': type という遷移の種類で conf が遷移して conf' になる *)
 Inductive trans : trans_type -> config -> config -> Prop :=
-| trans_dispatch : forall msg msgs actors actors',
-                     dispatch msg actors actors' ->
-                     trans Dispatch (conf (msg :: msgs) actors) (conf msgs actors')
-| trans_send_action : forall msg msgs actors actors',
-                        send_action msg actors actors' ->
-                        trans Send
-                              (conf msgs actors)
-                              (conf (msgs ++ [msg]) actors')
-| trans_new_action : forall msgs new_actor actors actors',
-                       new_action new_actor actors actors' ->
-                       trans New
-                             (conf msgs actors)
-                             (conf msgs (new_actor :: actors'))
-| trans_become_action : forall msgs actors actors',
-                          become_action actors actors' ->
-                          trans Become
-                                (conf msgs actors)
-                                (conf msgs actors').
+
+(* グローバルキューから、アクターのメッセージキューにメッセージを届ける *)
+(* External Actor へのメッセージだったら? (現状では configuration に宛先がいない場合はそこで遷移できなくなる) *)
+(* external_deliver というコンストラクタを追加するとか？=> そうなると configuration 同士をまとめるような configuration になるのでどう定義すればいいのかわからないし、変更するならかなり大規模な変更になりそう *)
+| trans_deliver : forall global_queue addr msg actions queue number actors_l actors_r,
+                    trans Deliver
+                          (conf (send_message addr msg :: global_queue)
+                                (actors_l
+                                   ++ actor_state addr actions queue number
+                                   :: actors_r))
+                          (conf global_queue
+                                (actors_l
+                                   ++ actor_state addr actions (queue ++ [msg]) number
+                                   :: actors_r))
+
+(* メッセージキューの先頭からメッセージを開封 *)
+(* deliver と合わせると、メッセージは必ず送信順に受け取られてしまうけど、いい？ *)
+(* 無限ループ以外は become 以外最後にならないので、become が来てたらもう他にアクションを起こさないから次のメッセージを受け取れる *)
+| trans_open : forall global_queue addr behv msg queue number actors_l actors_r,
+                 trans Open
+                       (conf global_queue
+                             (actors_l
+                                ++ actor_state addr (become behv) (msg :: queue) number
+                                :: actors_r))
+                       (conf global_queue
+                             (actors_l
+                                ++ actor_state addr (interp msg behv) queue number
+                                :: actors_r))
+(* send アクションが出てきたら、グローバルキューの最後にそのメッセージを追加 *)
+| trans_send : forall global_queue target msg addr cont queue number actors_l actors_r,
+                 trans Send
+                       (conf global_queue
+                             (actors_l
+                                ++ actor_state addr (send target msg cont) queue number
+                                :: actors_r))
+                       (conf (global_queue ++ [send_message target msg])
+                             (actors_l
+                                ++ actor_state addr cont queue number
+                                :: actors_r))
+
+| trans_new : forall global_queue addr behv cont queue number actors_l actors_r,
+                trans New
+                      (conf global_queue
+                            (actors_l
+                               ++ actor_state addr (new behv cont) queue number
+                               :: actors_r))
+                      (conf global_queue
+                            (actor_state (generated addr number) (become behv) [] 0 (* 最初は become behv で待ち状態 *)
+                               :: actors_l
+                               ++ actor_state addr (cont (generated addr number)) queue (S number)
+                               :: actors_r))
+
+| trans_self : forall global_queue addr cont queue number actors_l actors_r,
+                 trans Self
+                       (conf global_queue
+                             (actors_l
+                                ++ actor_state addr (self cont) queue number
+                                :: actors_r))
+                       (conf global_queue
+                             (actors_l
+                                ++ actor_state addr (cont addr) queue number
+                                :: actors_r)).
 
 Hint Constructors trans.
 
