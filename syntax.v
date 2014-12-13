@@ -179,6 +179,13 @@ Module Getter.
       | _ => True
     end.
 
+  (* Parent name with Prop from Name *)
+  Definition pprop_n (n : name) (P : name -> Prop) : Prop :=
+    match n with
+      | toplevel _ => True
+      | generated pr _ => P pr
+    end.
+
   (* Parent name and Generated number with Prop *)
   Definition pgprop (a : actor) (P : name -> gen_number -> Prop) : Prop :=
     match a with

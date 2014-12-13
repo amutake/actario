@@ -9,7 +9,7 @@ Require Import util syntax semantics name_dec.
 (* 自分の親も必ず入っている (全部つながっている) *)
 (* chain という名前微妙？ *)
 Definition chain (actors : list actor) : Prop :=
-  Forall (fun a => G.pprop a (fun parent => In parent (map G.n actors))) actors.
+  Forall (fun n => G.pprop_n n (fun p => In p (map G.n actors))) (map G.n actors).
 
 Hint Unfold chain.
 
@@ -85,6 +85,32 @@ Proof.
   - split; auto.
 Qed.
 
+Lemma Forall_pprop_n_or_r :
+  forall names P Q,
+    Forall (fun n => G.pprop_n n Q) names ->
+    Forall (fun n => G.pprop_n n (fun p => P p \/ Q p)) names.
+Proof.
+  intros names P Q H.
+  induction names as [ | h t ]; auto.
+  apply Forall_cons_iff.
+  apply Forall_cons_iff in H.
+  destruct H as [ Hh Ht ].
+  destruct h as [ | p g ]; simpl in *.
+  - split; auto.
+  - split; auto.
+Qed.
+
+Lemma In_name :
+  forall actor actors,
+    In actor actors -> In (G.n actor) (map G.n actors).
+Proof.
+  intros actor actors ina.
+  induction actors; simpl; auto.
+  simpl in ina.
+  destruct ina as [ ina | ina ]; [ left; subst; auto | ].
+  right; apply IHactors; auto.
+Qed.
+
 Lemma new_trans_chain :
   forall msgs msgs' actors actors',
     chain actors ->
@@ -95,26 +121,27 @@ Proof.
   inversion tr; subst.
   apply new_trans_parent_exists' in tr.
   unfold chain.
+  simpl.
   apply Forall_cons_iff.
   split; auto.
 
   unfold chain in ch.
+  rewrite map_app in *; simpl in *.
   apply Forall_app_iff in ch.
   destruct ch as [ ch_l ch' ].
   apply Forall_cons_iff in ch'.
   destruct ch' as [ ch_m ch_r ].
-  simpl in ch_m.
 
   apply Forall_app_iff.
   repeat (rewrite map_app in *; simpl in *; idtac).
 
   split.
-  - apply Forall_pprop_or_r; auto.
+  - apply Forall_pprop_n_or_r; auto.
   - apply Forall_cons_iff.
     split.
-    + simpl.
-      destruct addr; auto.
-    + apply Forall_pprop_or_r; auto.
+    + destruct addr; auto.
+      simpl; auto.
+    + apply Forall_pprop_n_or_r; auto.
 Qed.
 
 Lemma head_leaf_child_not_in :
@@ -130,7 +157,7 @@ Proof.
   (* 4. 3 で a' = ((n(a), gen), gen') のとき、p(a') = (n(a), gen) = n(a) \/ (n(a), gen) \in names(as) となるが、左は成り立たないので、(n(a), gen) \in names(actors) が成り立つ *)
   (* 5. 仮定に (n(a), gen) \nin names(actors) があるので矛盾 *)
   intros a actors gen gen' ch nin c.
-  unfold chain in ch.
+  unfold chain in ch; simpl in ch.
   apply Forall_cons_iff in ch.
   destruct ch as [ ch_a ch_as ].
   simpl in ch_as.
@@ -152,7 +179,7 @@ Proof.
       split; auto.
   - destruct ain as [ actor ain ].
     destruct ain as [ actor_name actor_in ].
-    eapply Forall_forall in ch_as; [ | apply actor_in ].
+    eapply Forall_forall in ch_as; [ | apply In_name in actor_in; apply actor_in ].
     destruct actor as [ n ].
     simpl in ch_as.
     destruct n as [ | p g' ]; simpl in actor_name.
@@ -169,35 +196,31 @@ Lemma chain_insert_iff :
 Proof.
   intros al ar a.
   split; intro H.
-  - apply Forall_app_iff in H.
+  - unfold chain in *; simpl in *; rewrite map_app in *; simpl in *.
+
+    apply Forall_app_iff in H.
     destruct H  as [ Hl H ].
     apply Forall_cons_iff in H.
     destruct H as [ H Hr ].
     apply Forall_cons_iff.
     split.
-    + destruct a as [ n a b s ].
-      rewrite map_app in H.
-      simpl in *.
-      destruct n as [ | p g ]; auto.
-      right.
-      rewrite map_app.
-      apply in_app_iff.
+    + destruct a as [ n a q s ]; simpl in *.
+      destruct n as [ | p g ]; simpl in *; auto.
       apply in_app_iff in H.
-      destruct H as [ H | H ]; auto.
-      simpl in H; destruct H as [ H | H ]; auto.
-      symmetry in H.
-      apply name_not_cycle in H.
-      easy.
-    + repeat (rewrite map_app in *; simpl in *; idtac).
-      apply Forall_app_iff.
+      destruct H as [ H | H ];
+        [ right; apply in_app_iff; left; auto
+        | simpl in H; destruct H as [ H | H ];
+          [ left; symmetry; auto
+          | right; apply in_app_iff; right; auto
+          ]
+        ].
+    + apply Forall_app_iff.
       split.
       * apply Forall_forall.
         intros x xin.
         eapply Forall_forall in Hl.
         { instantiate (1 := x) in Hl.
-          destruct x as [ xn xa xb xs ].
-          simpl in *.
-          destruct xn as [ | xp xg ]; auto.
+          destruct x as [ | xp xg ]; simpl in *; auto.
           apply in_app_iff in Hl.
           simpl in Hl.
           destruct Hl; [ right; apply in_app_iff; left; auto | ].
@@ -209,9 +232,7 @@ Proof.
         intros x xin.
         eapply Forall_forall in Hr.
         { instantiate (1 := x) in Hr.
-          destruct x as [ xn xa xb xs ].
-          simpl in *.
-          destruct xn as [ | xp xg ]; auto.
+          destruct x as [ | xp xg ]; simpl in *; auto.
           apply in_app_iff in Hr.
           simpl in Hr.
           destruct Hr; [ right; apply in_app_iff; left; auto | ].
@@ -219,7 +240,8 @@ Proof.
           right; apply in_app_iff; right; auto.
         }
         auto.
-  - apply Forall_cons_iff in H.
+  - unfold chain in *; repeat (rewrite map_app in *; simpl in *; idtac).
+    apply Forall_cons_iff in H.
     destruct H as [ H H' ].
     apply Forall_app_iff in H'.
     destruct H' as [ Hl Hr ].
@@ -231,9 +253,7 @@ Proof.
       intros x xin.
       eapply Forall_forall in Hl.
       * instantiate (1 := x) in Hl.
-        destruct x as [ xn xa xb xs ].
-        simpl in *.
-        destruct xn as [ | xp xg ]; auto.
+        destruct x as [ | xp xg ]; simpl in *; auto.
         apply in_app_iff.
         destruct Hl; [ right; simpl; left; auto | ].
         apply in_app_iff in H0.
@@ -254,9 +274,7 @@ Proof.
         intros x xin.
         eapply Forall_forall in Hr.
         { instantiate (1 := x) in Hr.
-          destruct x as [ xn xa xb xs ].
-          simpl in *.
-          destruct xn as [ | xp xg ]; auto.
+          destruct x as [ | xp xg ]; simpl in *; auto.
           apply in_app_iff.
           simpl.
           destruct Hr; [ right; left; auto | ].
@@ -266,73 +284,6 @@ Proof.
         auto.
 Qed.
 
-Lemma chain_map_name_1 :
-  forall actors,
-    chain actors -> Forall (fun n => match n with
-                                       | toplevel _ => True
-                                       | generated p _ => In p (map G.n actors)
-                                     end) (map G.n actors).
-Proof.
-  intros actors ch.
-  unfold chain in *.
-  unfold G.pprop in *.
-
-  (* induction actors as [ | h t ]; simpl; auto. *)
-  (* induction ch as [ | h t Hh ch IH ]; simpl; auto. *)
-  inversion ch as [ emp | h t Hh Ht as_eq ]; simpl; auto; subst.
-  simpl in *.
-
-  destruct h as [ n a q s ].
-  destruct n as [ | p g ]; simpl in *.
-
-  apply Forall_cons_iff.
-Admitted.
-
-Lemma In_name :
-  forall actor actors,
-    In actor actors -> In (G.n actor) (map G.n actors).
-Proof.
-  intros actor actors ina.
-  induction actors; simpl; auto.
-  simpl in ina.
-  destruct ina as [ ina | ina ]; [ left; subst; auto | ].
-  right; apply IHactors; auto.
-Qed.
-
-Lemma chain_map_name_2 :
-  forall actors,
-    Forall (fun n => match n with
-                       | toplevel _ => True
-                       | generated p _ => In p (map G.n actors)
-                     end) (map G.n actors) ->
-    chain actors.
-Proof.
-  intros actors all.
-  unfold chain.
-  unfold G.pprop.
-
-  apply Forall_forall.
-  intros a ina.
-  destruct a as [ n a q s ].
-  destruct n as [ | p g ]; auto.
-
-  eapply Forall_forall in all.
-  - instantiate (1 := (generated p g)) in all.
-    simpl in all; auto.
-  - apply In_name in ina.
-    simpl in ina; auto.
-Qed.
-
-Lemma chain_map_name_iff :
-  forall actors,
-    chain actors <-> Forall (fun n => match n with
-                                        | toplevel _ => True
-                                        | generated p _ => In p (map G.n actors)
-                                      end) (map G.n actors).
-Proof.
-  split; [ apply chain_map_name_1 | apply chain_map_name_2 ].
-Qed.
-
 Lemma chain_related_only_name :
   forall actors actors',
     map G.n actors = map G.n actors' ->
@@ -340,7 +291,6 @@ Lemma chain_related_only_name :
     chain actors'.
 Proof.
   intros actors actors' name_eq ch.
-  apply chain_map_name_iff.
-  apply chain_map_name_iff in ch.
+  unfold chain in *.
   rewrite name_eq in ch; auto.
 Qed.
