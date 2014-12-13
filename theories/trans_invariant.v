@@ -107,7 +107,7 @@ Hint Resolve trans_trans_invariant.
 Theorem trans_star_trans_invariant :
   forall conf conf',
     trans_invariant_config conf ->
-    trans_star conf conf' ->
+    conf ~>* conf' ->
     trans_invariant_config conf'.
 Proof.
   intros conf conf' conf_inv star.
@@ -116,10 +116,10 @@ Proof.
   unfold trans_invariant_config in conf_inv.
   destruct c1 as [ msgs1 as1 ].
   destruct c2 as [ msgs2 as2 ].
+  destruct H as [ t H ].
   eapply trans_trans_invariant in conf_inv.
   - apply conf_inv.
-  - specialize (H Send).        (* <- ??? *)
-    apply H.
+  - apply H.
 Qed.
 
 Lemma initial_trans_invariant :
@@ -147,7 +147,7 @@ Hint Resolve initial_trans_invariant.
 Theorem initial_trans_star_trans_invariant :
   forall conf conf',
     initial_config conf ->
-    trans_star conf conf' ->
+    conf ~>* conf' ->
     trans_invariant_config conf'.
 Proof.
   intros conf conf' ini star.
@@ -159,7 +159,7 @@ Qed.
 Theorem initial_trans_star_no_dup :
   forall config msgs actors,
     initial_config config ->
-    trans_star config (conf msgs actors) ->
+    config ~>* (conf msgs actors) ->
     no_dup actors.
 Proof.
   intros config msgs actors ini star.

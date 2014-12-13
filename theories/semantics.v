@@ -81,8 +81,13 @@ Inductive trans : trans_type -> config -> config -> Prop :=
 
 Hint Constructors trans.
 
+Notation "c1 '~(' t ')~>' c2" := (trans t c1 c2) (at level 70).
+
+Reserved Notation "c1 '~>*' c2" (at level 70).
+
 Inductive trans_star : config -> config -> Prop :=
-| trans_refl : forall c, trans_star c c
-| trans_trans : forall c1 c2 c3, (forall t, trans t c1 c2) -> trans_star c2 c3 -> trans_star c1 c3.
+| trans_refl : forall c, c ~>* c
+| trans_trans : forall c1 c2 c3, (exists t, c1 ~( t )~> c2) -> c2 ~>* c3 -> c1 ~>* c3
+where "c1 '~>*' c2" := (trans_star c1 c2).
 
 Hint Constructors trans_star.
