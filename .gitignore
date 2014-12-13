@@ -1,5 +1,6 @@
 *.vo
 *.glob
 *.v.d
+*.bak
 html
 actor

@@ -7,3 +7,4 @@ theories/chain.v
 theories/gen_fresh.v
 theories/no_dup.v
 theories/trans_invariant.v
+theories/properties.v
