@@ -36,13 +36,13 @@ Inductive message : Set :=
 | tuple_msg : message -> message -> message.
 
 (* Behavior は自分を指定することがよくあるので、Inductive だと再帰が書けなくなるので、CoInductive にしている *)
-CoInductive action : Type :=
-| new : behavior -> (name -> action) -> action (* CPS *)
-| send : name -> message -> action -> action   (* send n m a == n ! m;; a *)
-| self : (name -> action) -> action            (* CPS *)
-| become : behavior -> action                  (* become した後はアクションを取れない。become 以外は後に action が続かなければならないので、最後は必ず become になる *)
+CoInductive actions : Type :=
+| new : behavior -> (name -> actions) -> actions (* CPS *)
+| send : name -> message -> actions -> actions   (* send n m a == n ! m;; a *)
+| self : (name -> actions) -> actions            (* CPS *)
+| become : behavior -> actions                  (* become した後はアクションを取れない。become 以外は後に actions が続かなければならないので、最後は必ず become になる *)
 with behavior : Type :=
-| beh : (message -> action) -> behavior.
+| beh : (message -> actions) -> behavior.
 
 Notation "n '<-' 'new' behv ; cont" := (new behv (fun n => cont)) (at level 0, cont at level 10).
 Notation "n '!' m ';' a" := (send n m a) (at level 0, a at level 10).
@@ -50,8 +50,10 @@ Notation "me '<-' 'self' ';' cont" := (self (fun me => cont)) (at level 0, cont 
 
 Inductive sending : Type := send_message : name -> message -> sending.
 
+(* actor_state (このアクターの名前) (まだ実行していないアクション) (メッセージキュー) (生成番号) *)
 Inductive actor : Type :=
-| actor_state : name -> action -> behavior -> gen_number -> actor.
+| actor_state : name -> actions -> list message -> gen_number -> actor. (* behavior は持ってない。actions の最後に次の behavior が来るのと、アクションをし終わった (つまり become がでてきた) 状態のアクターしかメッセージを受け取れないので。でもこれはアクターとしてどうなの？外からは見えないものだけど。。 *)
+(* あと、グローバルメッセージキューの他に actor もメッセージキューを持つようにしたい。グローバルキューだけだと、先頭のメッセージの宛先のアクターがいつまでたっても仕事が終わらないとき、他のアクターはメッセージを受け取れない *)
 
 Inductive config : Type :=
 | conf : list sending -> list actor -> config.
@@ -62,14 +64,14 @@ CoFixpoint empty_behv : behavior := beh (fun _ => become empty_behv).
 (* 初期状態 *)
 (* toplevel アクター一つだけはちょっと強すぎるかもしれない？ *)
 Inductive initial_config : config -> Prop :=
-| init_conf : forall behv machine actions,
-                initial_config (conf [] [actor_state (toplevel machine) actions behv 0]).
+| init_conf : forall machine actions,
+                initial_config (conf [] [actor_state (toplevel machine) actions [] 0]).
 
 Hint Constructors initial_config.
 
 (* initial config を作るやつ *)
-Definition init (sys_name : string) (actions : action) : config :=
-  conf [] [ actor_state (toplevel sys_name) actions empty_behv 0 ].
+Definition init (sys_name : string) (initial_actions : actions) : config :=
+  conf [] [ actor_state (toplevel sys_name) initial_actions [] 0 ].
 
 Lemma init_is_initial_config :
   forall sys_name actions,
