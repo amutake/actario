@@ -39,8 +39,8 @@ $(call includecmdwithout@,$(COQBIN)coqtop -config)
 #                        #
 ##########################
 
-COQLIBS?=-I . 
-COQDOCLIBS?=
+COQLIBS?= -R theories Actor
+COQDOCLIBS?=-R theories Actor
 
 ##########################
 #                        #
@@ -80,20 +80,20 @@ endif
 #                    #
 ######################
 
-VFILES:=trans_invariant.v\
-  no_dup.v\
-  gen_fresh.v\
-  chain.v\
-  semantics.v\
-  name_dec.v\
-  syntax.v\
-  util.v
+VFILES:=theories/trans_invariant.v\
+  theories/no_dup.v\
+  theories/gen_fresh.v\
+  theories/chain.v\
+  theories/semantics.v\
+  theories/name_dec.v\
+  theories/syntax.v\
+  theories/util.v
 
 -include $(addsuffix .d,$(VFILES))
 .SECONDARY: $(addsuffix .d,$(VFILES))
 
 VOFILES:=$(VFILES:.v=.vo)
-VOFILESINC=$(filter $(wildcard ./*),$(VOFILES)) 
+VOFILES1=$(patsubst theories/%,%,$(filter theories/%,$(VOFILES)))
 GLOBFILES:=$(VFILES:.v=.glob)
 VIFILES:=$(VFILES:.v=.vi)
 GFILES:=$(VFILES:.v=.g)
@@ -163,15 +163,15 @@ userinstall:
 	+$(MAKE) USERINSTALL=true install
 
 install:
-	install -d $(DSTROOT)$(COQLIBINSTALL)/$(INSTALLDEFAULTROOT); \
-	for i in $(VOFILESINC); do \
-	 install -m 0644 $$i $(DSTROOT)$(COQLIBINSTALL)/$(INSTALLDEFAULTROOT)/`basename $$i`; \
+	cd "theories"; for i in $(VOFILES1); do \
+	 install -d "`dirname "$(DSTROOT)"$(COQLIBINSTALL)/Actor/$$i`"; \
+	 install -m 0644 $$i "$(DSTROOT)"$(COQLIBINSTALL)/Actor/$$i; \
 	done
 
 install-doc:
-	install -d "$(DSTROOT)"$(COQDOCINSTALL)/$(INSTALLDEFAULTROOT)/html
+	install -d "$(DSTROOT)"$(COQDOCINSTALL)/Actor/html
 	for i in html/*; do \
-	 install -m 0644 $$i "$(DSTROOT)"$(COQDOCINSTALL)/$(INSTALLDEFAULTROOT)/$$i;\
+	 install -m 0644 $$i "$(DSTROOT)"$(COQDOCINSTALL)/Actor/$$i;\
 	done
 
 clean:

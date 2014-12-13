@@ -1,8 +1,9 @@
-util.v
-syntax.v
-name_dec.v
-semantics.v
-chain.v
-gen_fresh.v
-no_dup.v
-trans_invariant.v
+-R theories Actor
+theories/util.v
+theories/syntax.v
+theories/name_dec.v
+theories/semantics.v
+theories/chain.v
+theories/gen_fresh.v
+theories/no_dup.v
+theories/trans_invariant.v
