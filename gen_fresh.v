@@ -457,7 +457,6 @@ Proof.
   intros msgs actors actors' actor.
   intros weak tr contra.
   inversion tr; subst.
-  inversion H2; subst.
   apply fresh_if_gen_fresh in weak.
   apply weak.
   simpl in *.
@@ -473,7 +472,6 @@ Proof.
   intros msgs actors actors' actor.
   intros fr tr.
   inversion tr; subst.
-  inversion H2; subst.
   apply fresh_if_gen_fresh in fr.
   rewrite map_app in *.
   simpl in *.
@@ -544,7 +542,7 @@ Proof.
     generalize dependent actors.
     induction actors'; intros actors Heq H; auto.
     destruct actors; simpl in *; inversion Heq; subst.
-    destruct a, a0; simpl in *.
+    destruct a1, a2; simpl in *.
     inversion H1; subst.
     inversion H; subst.
     constructor; auto.
