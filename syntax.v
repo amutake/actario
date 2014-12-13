@@ -7,14 +7,26 @@ Import ListNotations.
 Definition machine_addr := string.
 Definition gen_number := nat.
 
-Inductive name_type := Toplevel | Generated.
-
 Inductive name : Set :=
 | toplevel : machine_addr -> name
 | generated : name -> gen_number -> name. (* ユーザーに generated というコンストラクタを使わせたくないのだけどできる？ *)
 
-(* 任意の Set をメッセージとして送ることができるようにするなら、message と name と actor に型タグ付けないといけない (と思う) *)
-(* Inductive message (A : Set) : Set := wrap : A -> message A. みたいに。じゃないとパターンマッチできない *)
+(* 任意の Set をメッセージとして送ることができるようにするなら、message と name と actor と behavior に型タグ付けないといけない (と思う)
+ * Inductive message (A : Set) : Set := wrap : A -> message A. みたいに。じゃないとパターンマッチできない
+ *
+ * Inductive message : Type := wrap : forall A : Set, A -> message.
+ * match msg with
+ *   | wrap nat n => addr ! wrap (n + 1); become empty_behv
+ *   | _ => become empty_behv
+ * end
+ *
+ * とかできるかな？と思ったけどできなかった (n has type 'nat' but it is expected to have type 'Datatype.nat' とか言われる。同じなんだけど => nat という変数名にバインドされてるからか。でも型でパターンマッチすることはできない (要出典) から、やっぱできない)
+ * あとタプルを作るやつが Set じゃなくて Type だったのでメッセージにできなかった
+ *
+ * ターゲットを Erlang にするなら、Erlang のプリミティブをサポートするだけでいいかもしれない。
+ * atom は string をラップするだけでいい。Extraction のときに string を atom に変換する。
+ * Inductive atom : Set := mk_atom : string -> atom.
+ *)
 Inductive message : Set :=
 | empty_msg : message
 | name_msg : name -> message
