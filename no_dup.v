@@ -32,14 +32,13 @@ Proof.
   (* assert (ch' : chain actors'); *)
   (* apply new_trans_chain with (msgs := msgs) (msgs' := msgs') (actors' := actors') in ch; auto. *)
   inversion tr; subst.
-  inversion H2; subst.
-  clear tr H2.
+  clear tr.
   constructor.
   (* 1. gen_fresh の補題「gen_number が増えても、gen_fresh は成り立つ」(gen_fresh_increase) を使う *)
   (* 2. chain の補題「子がいないなら孫もいない」(no_child_no_grandchild) もしくは「いないやつの子はいない」(no_actor_no_child) を使う??? *)
   (* 3. no_dup の条件を使う *)
   - apply gen_fresh_increase in fr.
-    eapply gen_fresh_only_name_gen with (actors := actors_l ++ actor_state parent (new new_beh cont :: actions) behv (S number) :: actors_r); auto.
+    eapply gen_fresh_only_name_gen with (actors := actors_l ++ actor_state addr (new behv cont) queue (S number) :: actors_r); auto.
     repeat (rewrite map_app); auto.
   - intros yet le.
     rewrite map_app.
@@ -113,8 +112,7 @@ Lemma new_trans_no_dup :
 Proof.
   intros msgs msgs' actors actors' fr no tr.
   inversion tr; subst.
-  inversion H2; subst.
-  eapply new_trans_fresh with (actor0 := actor_state (generated parent number) [] new_beh 0) in fr.
+  eapply new_trans_fresh with (actor0 := actor_state (generated addr number) (become behv) [] 0) in fr.
   - unfold no_dup.
     simpl.
     constructor.
