@@ -165,14 +165,6 @@ Proof.
     apply H.
 Qed.
 
-(* 初期状態 *)
-(* toplevel アクター一つだけはちょっと強すぎるかもしれない *)
-Inductive initial_config : config -> Prop :=
-| init : forall behv machine actions,
-           initial_config (conf [] [actor_state (toplevel machine) actions behv 0]).
-
-Hint Constructors initial_config.
-
 Lemma initial_trans_invariant :
   forall conf,
     initial_config conf ->

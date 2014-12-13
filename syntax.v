@@ -47,8 +47,26 @@ Inductive config : Type :=
 (* メッセージを受け取っても何もしない振る舞い *)
 CoFixpoint empty_behv : behavior := beh (fun _ => become empty_behv).
 
+(* 初期状態 *)
+(* toplevel アクター一つだけはちょっと強すぎるかもしれない？ *)
+Inductive initial_config : config -> Prop :=
+| init_conf : forall behv machine actions,
+                initial_config (conf [] [actor_state (toplevel machine) actions behv 0]).
+
+Hint Constructors initial_config.
+
+(* initial config を作るやつ *)
 Definition init (sys_name : string) (actions : action) : config :=
   conf [] [ actor_state (toplevel sys_name) actions empty_behv 0 ].
+
+Lemma init_is_initial_config :
+  forall sys_name actions,
+    initial_config (init sys_name actions).
+Proof.
+  intros sys_name actions.
+  unfold init.
+  auto.
+Qed.
 
 (* Examples *)
 Module NotationExamples.
