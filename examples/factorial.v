@@ -10,7 +10,7 @@ Import ListNotations.
  *)
 
 CoFixpoint factorial_cont_behv (val : nat) (cust : name) : behavior :=
-  beh (fun msg =>
+  mk_behv (fun msg =>
          match msg with
            | nat_msg arg =>
              cust ! nat_msg (val * arg);
@@ -19,7 +19,7 @@ CoFixpoint factorial_cont_behv (val : nat) (cust : name) : behavior :=
          end).
 
 CoFixpoint factorial_behv : behavior :=
-  beh (fun msg =>
+  mk_behv (fun msg =>
          match msg with
            | tuple_msg (nat_msg 0) (name_msg cust) =>
              cust ! nat_msg 1;

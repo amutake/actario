@@ -49,7 +49,7 @@ CoInductive actions : Type :=
 | self : (name -> actions) -> actions            (* CPS *)
 | become : behavior -> actions                   (* become した後はアクションを取れない。become 以外は後に actions が続かなければならないので、次のメッセージを受け取れる状態になれば必ず become になる *)
 with behavior : Type :=
-| beh : (message -> actions) -> behavior.
+| mk_behv : (message -> actions) -> behavior.
 
 Notation "n '<-' 'new' behv ; cont" := (new behv (fun n => cont)) (at level 0, cont at level 10).
 Notation "n '!' m ';' a" := (send n m a) (at level 0, a at level 10).
@@ -71,7 +71,7 @@ Inductive config : Type :=
 | conf : list sending -> list actor -> config. (* config が list sending を持つメリットはある？External Actor への送信とか？ *)
 
 (* メッセージを受け取っても何もしない振る舞い *)
-CoFixpoint empty_behv : behavior := beh (fun _ => become empty_behv).
+CoFixpoint empty_behv : behavior := mk_behv (fun _ => become empty_behv).
 
 (* 初期状態 *)
 (* toplevel アクター一つだけはちょっと強すぎるかもしれない？ *)
