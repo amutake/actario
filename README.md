@@ -1,7 +1,7 @@
 Actor Verification Framework
 ============================
 
-This is a library to formalize and verify Actor systems on Coq.
+This is a framework to formalize and verify Actor systems on Coq.
 
 **There is a possibility to change the repository name**
 
@@ -31,11 +31,14 @@ See [`examples`](./examples).
 Current status
 --------------
 
+- [x] Formalization of Actor model's syntax and semantics
+    + syntax: `new`, `send`, `self`, `become` (theories/syntax.v, `actions`)
+    + semantics: labelled transition semantics (theories/semantics.v, `trans`)
 - [x] Convenient notation
-    + syntax.v
+    + theories/syntax.v
 - [x] Proof of no duplication of Actor names
-    + trans_invariant.v (`initial_trans_star_no_dup`)
-- [ ] Mechanism to verify Actor systems
-- [ ] Communication between configurations
+    + theories/trans_invariant.v (`initial_trans_star_no_dup`)
+- [ ] Mechanisms/Lemmas to verify Actor systems
+- [ ] Communication between configurations (for distributed systems)
 - [ ] Extraction to Erlang
 - [ ] Supervisor / Monitor / Link
