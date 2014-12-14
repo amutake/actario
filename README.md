@@ -1,7 +1,9 @@
-Actor Verification Library
-==========================
+Actor Verification Framework
+============================
 
 This is a library to formalize and verify Actor systems on Coq.
+
+**There is a possibility to change the repository name**
 
 
 Requirements
@@ -23,7 +25,7 @@ $ make install
 Examples
 --------
 
-See [`examples`](./examples) directory.
+See [`examples`](./examples).
 
 
 Current status
