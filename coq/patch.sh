@@ -6,7 +6,7 @@
 set -e # http://www.clear-code.com/blog/2012/10/11.html
 
 scriptname="patch.sh"
-prefix="coq-"
+prefix="coq-" # Don't edit
 suffix="+actor"
 
 cd `dirname $0`
@@ -14,6 +14,14 @@ cd `dirname $0`
 original=${prefix}${2}
 patched=${prefix}${2}${suffix}
 patch_file=${2}.patch
+
+function version_specify() {
+    if [ "$1" = "" ]; then
+        echo "Please specify the Coq version"
+        echo "e.g., ./${scriptname} <command> 8.4pl5"
+        exit 0
+    fi
+}
 
 function remove_original() {
     if [ -d ${original} ]; then
@@ -43,20 +51,16 @@ function remove_patched() {
 
 case "$1" in
     "make")
-        if [ "$2" = "" ]; then
-            echo "Please specify the Coq version"
-            echo "e.g., ./${scriptname} make 8.4pl5"
-        elif [ -d ${original} ] && [ -d ${patched} ]; then
+        version_specify "$2"
+        if [ -d ${original} ] && [ -d ${patched} ]; then
             diff -u -N -r ${original} ${patched} > ${patch_file}
         else
             echo "${original} and ${patched} are required"
         fi
         ;;
     "apply")
-        if [ "$2" = "" ]; then
-            echo "Please specify the Coq version"
-            echo "e.g., ./${scriptname} apply 8.4pl5"
-        elif [ -d ${original} ] && [ -f ${patch_file} ]; then
+        version_specify "$2"
+        if [ -d ${original} ] && [ -f ${patch_file} ]; then
             remove_patched
             cp -r ${original} ${patched}
             patch -u -p1 -d ${patched} < ${patch_file}
@@ -65,10 +69,8 @@ case "$1" in
         fi
         ;;
     "auto")
-        if [ "$2" = "" ]; then
-            echo "Please specify the Coq version"
-            echo "e.g., ./${scriptname} auto 8.4pl5"
-        elif [ -f ${patch_file} ]; then
+        version_specify "$2"
+        if [ -f ${patch_file} ]; then
             remove_original
             tarball=coq-${2}.tar.gz
             wget https://coq.inria.fr/distrib/V${2}/files/${tarball}
@@ -99,21 +101,27 @@ case "$1" in
         fi
         ;;
     "setup")
-        if [ "$2" = "" ]; then
-            echo "Please specify the Coq version"
-            echo "e.g., ./${scriptname} setup 8.4pl5"
-        else
-            remove_original
-            tarball=coq-${2}.tar.gz
-            wget https://coq.inria.fr/distrib/V${2}/files/${tarball}
-            tar xf ${tarball}
-            rm ${tarball}
-            remove_patched
-            cp -r ${original} ${patched}
-            if [ -f ${patch_file} ]; then
-                patch -u -p1 -d ${patched} < ${patch_file}
-            fi
+        version_specify "$2"
+        remove_original
+        tarball=coq-${2}.tar.gz
+        wget https://coq.inria.fr/distrib/V${2}/files/${tarball}
+        tar xf ${tarball}
+        rm ${tarball}
+        remove_patched
+        cp -r ${original} ${patched}
+        if [ -f ${patch_file} ]; then
+            patch -u -p1 -d ${patched} < ${patch_file}
         fi
+        ;;
+    "clean")
+        version_specify "$2"
+        rm -rf bin etc lib share
+        cd ${patched}
+        make distclean
+        find . -type f -name "*.cmt" | xargs rm -f
+        find . -type f -name "*.cmti" | xargs rm -f
+        rm -rf bin
+        rm -f ide/coqide_main_opt.ml
         ;;
     *)
         echo "Usage: ${scriptname} <command> <args>"
@@ -123,5 +131,6 @@ case "$1" in
         echo "  apply <version>    - apply patch to Coq"
         echo "  auto  <version>    - auto (but some interactive) download, apply patch, build, install"
         echo "  setup <version>    - setup for development"
+        echo "  clean <version>    - clean for development"
         ;;
 esac
