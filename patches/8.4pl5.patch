@@ -1,0 +1,126 @@
+diff -u -N -r coq-8.4pl5/plugins/extraction/common.ml coq-8.4pl5+actor/plugins/extraction/common.ml
+--- coq-8.4pl5/plugins/extraction/common.ml	2014-10-22 17:30:53.000000000 +0900
++++ coq-8.4pl5+actor/plugins/extraction/common.ml	2014-12-14 21:42:13.000000000 +0900
+@@ -569,6 +569,7 @@
+       | Scheme -> unquote s (* no modular Scheme extraction... *)
+       | Haskell -> if modular () then pp_haskell_gen k mp rls else s
+       | Ocaml -> pp_ocaml_gen k mp rls (Some l)
++      | Erlang -> s
+ 
+ (* The next function is used only in Ocaml extraction...*)
+ 
+diff -u -N -r coq-8.4pl5/plugins/extraction/erlang.ml coq-8.4pl5+actor/plugins/extraction/erlang.ml
+--- coq-8.4pl5/plugins/extraction/erlang.ml	1970-01-01 09:00:00.000000000 +0900
++++ coq-8.4pl5+actor/plugins/extraction/erlang.ml	2014-12-14 21:39:06.000000000 +0900
+@@ -0,0 +1,35 @@
++open Pp
++open Names
++open Miniml
++
++let keywords =
++  List.fold_right
++    (fun s -> Idset.add (id_of_string s))
++    [ "module"; "export";
++      "fun"; "end"; "if"; "case"; "of"; "when";
++      "receive"; "after"; "try"; "catch" ]
++    Idset.empty
++
++(* preamble : identifier -> module_path list -> unsafe_needs -> std_ppcmds *)
++let preamble mod_name used_modules usf =
++  mt ()
++
++let pp_struct = function
++  | _ -> mt ()
++
++let pp_decl = function
++  | Dind (_, _) -> mt ()        (* Inductive は何も出力しない *)
++  | Dtype (_, _, _) -> mt ()    (* Type alias は何も出力しない *)
++  | Dterm (r, ast, typ) -> mt ()
++  | Dfix (rs, asts, typs) -> mt ()
++
++let erlang_descr = {
++  keywords = keywords;
++  file_suffix = ".erl";
++  preamble = preamble;
++  pp_struct = pp_struct;
++  sig_suffix = None;
++  sig_preamble = (fun _ _ _ -> mt ());
++  pp_sig = (fun _ -> mt ());
++  pp_decl = pp_decl;
++}
+diff -u -N -r coq-8.4pl5/plugins/extraction/erlang.mli coq-8.4pl5+actor/plugins/extraction/erlang.mli
+--- coq-8.4pl5/plugins/extraction/erlang.mli	1970-01-01 09:00:00.000000000 +0900
++++ coq-8.4pl5+actor/plugins/extraction/erlang.mli	2014-12-14 21:38:00.000000000 +0900
+@@ -0,0 +1 @@
++val erlang_descr : Miniml.language_descr
+diff -u -N -r coq-8.4pl5/plugins/extraction/extract_env.ml coq-8.4pl5+actor/plugins/extraction/extract_env.ml
+--- coq-8.4pl5/plugins/extraction/extract_env.ml	2014-10-22 17:30:53.000000000 +0900
++++ coq-8.4pl5+actor/plugins/extraction/extract_env.ml	2014-12-14 22:13:36.000000000 +0900
+@@ -379,6 +379,7 @@
+   | Ocaml -> Ocaml.ocaml_descr
+   | Haskell -> Haskell.haskell_descr
+   | Scheme -> Scheme.scheme_descr
++  | Erlang -> Erlang.erlang_descr
+ 
+ (* From a filename string "foo.ml" or "foo", builds "foo.ml" and "foo.mli"
+    Works similarly for the other languages. *)
+diff -u -N -r coq-8.4pl5/plugins/extraction/extraction_plugin.mllib coq-8.4pl5+actor/plugins/extraction/extraction_plugin.mllib
+--- coq-8.4pl5/plugins/extraction/extraction_plugin.mllib	2014-10-22 17:30:53.000000000 +0900
++++ coq-8.4pl5+actor/plugins/extraction/extraction_plugin.mllib	2014-12-14 22:16:26.000000000 +0900
+@@ -6,6 +6,7 @@
+ Ocaml
+ Haskell
+ Scheme
++Erlang
+ Extract_env
+ G_extraction
+ Extraction_plugin_mod
+diff -u -N -r coq-8.4pl5/plugins/extraction/g_extraction.ml4 coq-8.4pl5+actor/plugins/extraction/g_extraction.ml4
+--- coq-8.4pl5/plugins/extraction/g_extraction.ml4	2014-10-22 17:30:53.000000000 +0900
++++ coq-8.4pl5+actor/plugins/extraction/g_extraction.ml4	2014-12-14 21:43:53.000000000 +0900
+@@ -43,12 +43,14 @@
+   | Ocaml -> str "Ocaml"
+   | Haskell -> str "Haskell"
+   | Scheme -> str "Scheme"
++  | Erlang -> str "Erlang"
+ 
+ VERNAC ARGUMENT EXTEND language
+ PRINTED BY pr_language
+ | [ "Ocaml" ] -> [ Ocaml ]
+ | [ "Haskell" ] -> [ Haskell ]
+ | [ "Scheme" ] -> [ Scheme ]
++| [ "Erlang" ] -> [ Erlang ]
+ END
+ 
+ (* Extraction commands *)
+diff -u -N -r coq-8.4pl5/plugins/extraction/table.ml coq-8.4pl5+actor/plugins/extraction/table.ml
+--- coq-8.4pl5/plugins/extraction/table.ml	2014-10-22 17:30:53.000000000 +0900
++++ coq-8.4pl5+actor/plugins/extraction/table.ml	2014-12-14 21:45:30.000000000 +0900
+@@ -534,7 +534,7 @@
+ 
+ (*s Extraction Lang *)
+ 
+-type lang = Ocaml | Haskell | Scheme
++type lang = Ocaml | Haskell | Scheme | Erlang
+ 
+ let lang_ref = ref Ocaml
+ 
+diff -u -N -r coq-8.4pl5/plugins/extraction/table.mli coq-8.4pl5+actor/plugins/extraction/table.mli
+--- coq-8.4pl5/plugins/extraction/table.mli	2014-10-22 17:30:53.000000000 +0900
++++ coq-8.4pl5+actor/plugins/extraction/table.mli	2014-12-14 21:45:57.000000000 +0900
+@@ -133,7 +133,7 @@
+ 
+ (*s Target language. *)
+ 
+-type lang = Ocaml | Haskell | Scheme
++type lang = Ocaml | Haskell | Scheme | Erlang
+ val lang : unit -> lang
+ 
+ (*s Extraction modes: modular or monolithic, library or minimal ?
+@@ -192,6 +192,3 @@
+ val extraction_blacklist : identifier list -> unit
+ val reset_extraction_blacklist : unit -> unit
+ val print_extraction_blacklist : unit -> unit
+-
+-
+-
