@@ -115,13 +115,13 @@ case "$1" in
         ;;
     "clean")
         version_specify "$2"
-        rm -rf bin etc lib share
+        rm -rf bin etc lib share || true
         cd ${patched}
         make distclean
         find . -type f -name "*.cmt" | xargs rm -f
         find . -type f -name "*.cmti" | xargs rm -f
-        rm -rf bin
-        rm -f ide/coqide_main_opt.ml
+        rm -rf bin || true
+        rm -f ide/coqide_main_opt.ml || true
         ;;
     *)
         echo "Usage: ${scriptname} <command> <args>"
