@@ -1,3 +1,30 @@
+diff -u -N -r coq-8.4pl5/lib/pp.mli coq-8.4pl5+actor/lib/pp.mli
+--- coq-8.4pl5/lib/pp.mli	2014-10-22 17:30:53.000000000 +0900
++++ coq-8.4pl5+actor/lib/pp.mli	2014-12-15 00:24:28.000000000 +0900
+@@ -22,12 +22,12 @@
+ 
+ (** {6 Formatting commands. } *)
+ 
+-val str  : string -> std_ppcmds
++val str  : string -> std_ppcmds (* 文字列の出力 *)
+ val stras : int * string -> std_ppcmds
+ val brk : int * int -> std_ppcmds
+ val tbrk : int * int -> std_ppcmds
+ val tab : unit -> std_ppcmds
+-val fnl : unit -> std_ppcmds
++val fnl : unit -> std_ppcmds    (* 改行の出力 *)
+ val pifb : unit -> std_ppcmds
+ val ws : int -> std_ppcmds
+ val mt : unit -> std_ppcmds
+@@ -64,7 +64,7 @@
+ val h : int -> std_ppcmds -> std_ppcmds
+ val v : int -> std_ppcmds -> std_ppcmds
+ val hv : int -> std_ppcmds -> std_ppcmds
+-val hov : int -> std_ppcmds -> std_ppcmds
++val hov : int -> std_ppcmds -> std_ppcmds (* 出力するやつを int だけインデント？ *)
+ val t : std_ppcmds -> std_ppcmds
+ 
+ (** {6 Opening and closing of boxes. } *)
 diff -u -N -r coq-8.4pl5/plugins/extraction/common.ml coq-8.4pl5+actor/plugins/extraction/common.ml
 --- coq-8.4pl5/plugins/extraction/common.ml	2014-10-22 17:30:53.000000000 +0900
 +++ coq-8.4pl5+actor/plugins/extraction/common.ml	2014-12-14 21:42:13.000000000 +0900
@@ -11,11 +38,14 @@ diff -u -N -r coq-8.4pl5/plugins/extraction/common.ml coq-8.4pl5+actor/plugins/e
  
 diff -u -N -r coq-8.4pl5/plugins/extraction/erlang.ml coq-8.4pl5+actor/plugins/extraction/erlang.ml
 --- coq-8.4pl5/plugins/extraction/erlang.ml	1970-01-01 09:00:00.000000000 +0900
-+++ coq-8.4pl5+actor/plugins/extraction/erlang.ml	2014-12-14 21:39:06.000000000 +0900
-@@ -0,0 +1,35 @@
++++ coq-8.4pl5+actor/plugins/extraction/erlang.ml	2014-12-15 00:38:37.000000000 +0900
+@@ -0,0 +1,55 @@
 +open Pp
 +open Names
++open Nameops
 +open Miniml
++open Mlutil
++open Common
 +
 +let keywords =
 +  List.fold_right
@@ -25,9 +55,20 @@ diff -u -N -r coq-8.4pl5/plugins/extraction/erlang.ml coq-8.4pl5+actor/plugins/e
 +      "receive"; "after"; "try"; "catch" ]
 +    Idset.empty
 +
++(* pp_comma_sep : identifier list -> std_ppcmds *)
++let rec pp_comma_sep = function
++  | [] -> mt ()
++  | [id] -> pr_id id
++  | id :: tl -> pr_id id ++ str ", " ++ pp_comma_sep tl
++
++let pp_expr env args = function
++  | _ -> mt ()
++
 +(* preamble : identifier -> module_path list -> unsafe_needs -> std_ppcmds *)
++(* preamble で -export([Function1/Arity1,..,FunctionN/ArityN]) を出力したいが、関数名の情報は入力に含まれないので、モジュール名だけ出力する *)
++(* preamble の入力に関数名と引数の数が含まれるようなものを渡すように改造したほうがいいかもしれない *)
 +let preamble mod_name used_modules usf =
-+  mt ()
++  str "-module(" ++ pr_id mod_name ++ str ")." ++ fnl2 ()
 +
 +let pp_struct = function
 +  | _ -> mt ()
@@ -35,7 +76,13 @@ diff -u -N -r coq-8.4pl5/plugins/extraction/erlang.ml coq-8.4pl5+actor/plugins/e
 +let pp_decl = function
 +  | Dind (_, _) -> mt ()        (* Inductive は何も出力しない *)
 +  | Dtype (_, _, _) -> mt ()    (* Type alias は何も出力しない *)
-+  | Dterm (r, ast, typ) -> mt ()
++  | Dterm (r, ast, _) ->        (* 関数ではない定義 *)
++     (* haskell.ml の pp_function とほぼおなじ *)
++     let e = pp_global Term r in (* e : 関数名 *)
++     let bl, ast' = collect_lams ast in (* bl : ml_ident list (引数のリスト), ast' : ml_ast (これはなに？) *)
++     let bl, env = push_vars (List.map id_of_mlid bl) (empty_env ()) in (* bl : identifier list *)
++     str e ++ str "(" ++ pp_comma_sep (List.rev bl) ++ str ") ->" ++ fnl () ++
++       str "  " ++ hov 2 (pp_expr env [] ast') ++ fnl2 ()
 +  | Dfix (rs, asts, typs) -> mt ()
 +
 +let erlang_descr = {
