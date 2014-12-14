@@ -8,8 +8,9 @@ CoFixpoint echo_server_behavior : behavior :=
   beh (fun msg =>
          match msg with
            | tuple_msg (name_msg sender) content =>
-             sender ! content; become echo_server_behavior
-                             | _ => become echo_server_behavior
+             sender ! content;
+             become echo_server_behavior
+           | _ => become echo_server_behavior
          end).
 
 (* サーバに Hello! というメッセージを送り続ける *)
@@ -17,8 +18,8 @@ CoFixpoint echo_server_behavior : behavior :=
 CoFixpoint echo_client_behavior (server : name) : behavior :=
   beh (fun _ =>
          me <- self;
-       server ! (tuple_msg (name_msg me) (str_msg "Hello!"));
-       become (echo_client_behavior server)
+         server ! (tuple_msg (name_msg me) (str_msg "Hello!"));
+         become (echo_client_behavior server)
       ).
 
 Definition echo_init_system : config :=
