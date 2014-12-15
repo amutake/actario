@@ -5,7 +5,7 @@ Require Import Actor.syntax Actor.semantics.
 
 (* 受け取ったメッセージを送ってきたアクターにそのまま返す *)
 CoFixpoint echo_server_behavior : behavior :=
-  mk_behv (fun msg =>
+  receive (fun msg =>
          match msg with
            | tuple_msg (name_msg sender) content =>
              sender ! content;
@@ -16,7 +16,7 @@ CoFixpoint echo_server_behavior : behavior :=
 (* サーバに Hello! というメッセージを送り続ける *)
 (* echo_server に送ったとき、ちゃんと Hello! が返ってきたことを確かめるには？ *)
 CoFixpoint echo_client_behavior (server : name) : behavior :=
-  mk_behv (fun _ =>
+  receive (fun _ =>
          me <- self;
          server ! (tuple_msg (name_msg me) (str_msg "Hello!"));
          become (echo_client_behavior server)

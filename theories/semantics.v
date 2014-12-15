@@ -8,7 +8,7 @@ Require Import syntax.
 
 Definition interp (m : message) (b : behavior) : actions :=
   match b with
-    | mk_behv f => f m
+    | receive f => f m
   end.
 
 Inductive trans_type := Deliver | Open | Send | New | Self.
