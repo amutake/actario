@@ -38,14 +38,20 @@ diff -u -N -r coq-8.4pl5/plugins/extraction/common.ml coq-8.4pl5+actor/plugins/e
  
 diff -u -N -r coq-8.4pl5/plugins/extraction/erlang.ml coq-8.4pl5+actor/plugins/extraction/erlang.ml
 --- coq-8.4pl5/plugins/extraction/erlang.ml	1970-01-01 09:00:00.000000000 +0900
-+++ coq-8.4pl5+actor/plugins/extraction/erlang.ml	2014-12-15 00:38:37.000000000 +0900
-@@ -0,0 +1,55 @@
++++ coq-8.4pl5+actor/plugins/extraction/erlang.ml	2014-12-15 04:45:28.000000000 +0900
+@@ -0,0 +1,130 @@
 +open Pp
 +open Names
 +open Nameops
++open Util
 +open Miniml
 +open Mlutil
 +open Common
++
++let upper_id id = string_of_id id |> String.uncapitalize |> id_of_string
++
++let pr_lower_id id = str (String.uncapitalize (string_of_id id))
++let pr_upper_id id = str (String.capitalize (string_of_id id))
 +
 +let keywords =
 +  List.fold_right
@@ -55,14 +61,78 @@ diff -u -N -r coq-8.4pl5/plugins/extraction/erlang.ml coq-8.4pl5+actor/plugins/e
 +      "receive"; "after"; "try"; "catch" ]
 +    Idset.empty
 +
-+(* pp_comma_sep : identifier list -> std_ppcmds *)
-+let rec pp_comma_sep = function
-+  | [] -> mt ()
-+  | [id] -> pr_id id
-+  | id :: tl -> pr_id id ++ str ", " ++ pp_comma_sep tl
++let pp_atom st = str "'" ++ str st ++ str "'"
++let pp_tuple elms = str "{" ++ prlist_with_sep pr_comma identity elms ++ str "}"
 +
-+let pp_expr env args = function
-+  | _ -> mt ()
++(* pp_arguments : ('a -> pp_stdcmds) -> 'a list -> std_ppcmds *)
++let pp_arguments f args =
++  pp_par true (prlist_with_sep pr_comma f args)
++
++(* pp_pattern : env -> int -> std_ppcmds *)
++(* num は変数の数 *)
++let rec pp_pattern env num = function
++  | Pcons (r, pats) -> pp_tuple (str (pp_global Cons r) :: List.map (pp_pattern env num) pats)
++  | Ptuple pats -> pp_tuple (List.map (pp_pattern env num) pats)
++  | Prel n -> pr_id (get_db_name n env)
++  | Pwild -> str "_"
++  | Pusual r ->
++     let rec n_to_1 n = if n < 1 then [] else n :: n_to_1 (n - 1) in
++     let pats = List.map (fun n -> Prel n) (n_to_1 num) in
++     pp_pattern env num (Pcons (r, pats))
++
++(* pp_branch : env -> ml_branch -> std_ppcmds *)
++let rec pp_branch env = function
++  | (ids, pat, a) ->
++     let ids', env' = push_vars (List.rev_map id_of_mlid ids) env in
++     pp_pattern env (List.length ids) pat ++ spc () ++ pp_expr env a
++
++(* pp_branches : env -> ml_branch array -> std_ppcmds *)
++and pp_branches env pats =
++  prvect_with_sep pr_semicolon identity (Array.map (pp_branch env) pats)
++
++(* pp_expr : env -> ml_ast -> std_ppcmds *)
++and pp_expr env = function
++  | MLrel n ->                  (* 環境から de Bruijn index で入れた変数名を取り出す *)
++     let id = get_db_name n env in
++     pr_id id
++  | MLapp (f, args) ->         (* 関数適用 *)
++     let f = pp_par true (pp_expr env f) in (* 関数は括弧で囲んどく *)
++     let args = List.map (pp_expr env) args in
++     f ++ pp_arguments identity args (* (F)(Arg1, Arg2, Arg3) みたいになる *)
++  | MLlam _ as a ->             (* 無名関数 *)
++     let args, a' = collect_lams a in (* fun x -> fun y -> ... -> t を fun x y ... -> t にする *)
++     let args, env' = push_vars (List.map (fun id -> id_of_mlid id |> upper_id) args) env in (* 環境に入れる *)
++     str "fun" ++ pp_arguments pr_id (List.rev args) ++ str " -> " ++ pp_expr env' a' ++ str " end"
++  | MLletin (id, a1, a2) ->     (* 局所束縛 *)
++     let i, env' = push_vars [upper_id (id_of_mlid id)] env in
++     let pp_id = pr_id (List.hd i) in
++     let pp_a1 = pp_expr env a1 in
++     let pp_a2 = pp_expr env' a2 in
++     pp_id ++ str " = " ++ pp_a1 ++ str "," ++ fnl () ++ pp_a2
++  | MLglob r -> (* ??? トップレベルに定義してる名前とか？ *)
++     str (pp_global Term r)
++  | MLcons (_, r, asts) ->      (* MLcons (型, コンストラクタ名, 引数) だと思う、たぶん *)
++     let c = pp_global Cons r in
++     let sts = List.map (pp_expr env) asts in
++     (* ここを actions と behavior のコンストラクタのときだけ別なように処理すればいい *)
++     pp_tuple (pp_atom c :: sts)
++  | MLtuple asts ->             (* タプル *)
++     let sts = List.map (pp_expr env) asts in
++     pp_tuple sts
++  | MLcase (_, a, pats) ->      (* パターンマッチ *)
++     let a = pp_expr env a in
++     str "case " ++ a ++ str " of" ++ fnl () ++
++       str "  " ++ hov 2 (pp_branches env pats) ++
++       str "end"
++  | MLfix (i, ids, defs) ->     (* 相互再帰 *)
++     let ids', env' = push_vars (List.rev (Array.to_list ids)) env in
++     let zipped = array_map2 (fun a b -> a, b) (Array.of_list (List.rev ids')) defs in
++     pr_id ids.(i)              (* <- ??? *)
++  | MLexn s ->                  (* 例外 *)
++     str "throw(\"" ++ str s ++ str "\")"
++  | MLdummy -> str "__"         (* ??? *)
++  | MLaxiom -> str "throw(\"axiom\")"
++  | MLmagic a -> pp_expr env a
 +
 +(* preamble : identifier -> module_path list -> unsafe_needs -> std_ppcmds *)
 +(* preamble で -export([Function1/Arity1,..,FunctionN/ArityN]) を出力したいが、関数名の情報は入力に含まれないので、モジュール名だけ出力する *)
@@ -79,10 +149,15 @@ diff -u -N -r coq-8.4pl5/plugins/extraction/erlang.ml coq-8.4pl5+actor/plugins/e
 +  | Dterm (r, ast, _) ->        (* 関数ではない定義 *)
 +     (* haskell.ml の pp_function とほぼおなじ *)
 +     let e = pp_global Term r in (* e : 関数名 *)
-+     let bl, ast' = collect_lams ast in (* bl : ml_ident list (引数のリスト), ast' : ml_ast (これはなに？) *)
++     (* bl : ml_ident list (引数のリスト), ast' : 関数の本体 *)
++     (* collect_lams は mlutil.ml に定義されてて、
++      * fun x -> fun y -> fun z -> ... -> t みたいなのを、
++      * ([ x; y; z; ... ], t) にする
++      *)
++     let bl, ast' = collect_lams ast in
 +     let bl, env = push_vars (List.map id_of_mlid bl) (empty_env ()) in (* bl : identifier list *)
-+     str e ++ str "(" ++ pp_comma_sep (List.rev bl) ++ str ") ->" ++ fnl () ++
-+       str "  " ++ hov 2 (pp_expr env [] ast') ++ fnl2 ()
++     str e ++ pp_arguments pr_id (List.map upper_id (List.rev bl)) ++ str " ->" ++ fnl () ++
++       str "  " ++ hov 2 (pp_expr env ast') ++ str "." ++ fnl2 ()
 +  | Dfix (rs, asts, typs) -> mt ()
 +
 +let erlang_descr = {
@@ -140,6 +215,22 @@ diff -u -N -r coq-8.4pl5/plugins/extraction/g_extraction.ml4 coq-8.4pl5+actor/pl
  END
  
  (* Extraction commands *)
+diff -u -N -r coq-8.4pl5/plugins/extraction/miniml.mli coq-8.4pl5+actor/plugins/extraction/miniml.mli
+--- coq-8.4pl5/plugins/extraction/miniml.mli	2014-10-22 17:30:53.000000000 +0900
++++ coq-8.4pl5+actor/plugins/extraction/miniml.mli	2014-12-15 01:24:04.000000000 +0900
+@@ -110,9 +110,9 @@
+ 
+ and ml_ast =
+   | MLrel    of int
+-  | MLapp    of ml_ast * ml_ast list
+-  | MLlam    of ml_ident * ml_ast
+-  | MLletin  of ml_ident * ml_ast * ml_ast
++  | MLapp    of ml_ast * ml_ast list (* 適用 *)
++  | MLlam    of ml_ident * ml_ast    (* 関数 *)
++  | MLletin  of ml_ident * ml_ast * ml_ast (* 局所束縛 let ... in *)
+   | MLglob   of global_reference
+   | MLcons   of ml_type * global_reference * ml_ast list
+   | MLtuple  of ml_ast list
 diff -u -N -r coq-8.4pl5/plugins/extraction/table.ml coq-8.4pl5+actor/plugins/extraction/table.ml
 --- coq-8.4pl5/plugins/extraction/table.ml	2014-10-22 17:30:53.000000000 +0900
 +++ coq-8.4pl5+actor/plugins/extraction/table.ml	2014-12-14 21:45:30.000000000 +0900

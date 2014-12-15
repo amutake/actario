@@ -78,7 +78,7 @@ case "$1" in
             rm ${tarball}
             patch -u -p1 -d ${original} < ${patch_file}
             cd ${original}
-            echo -n "Please input configure option (e.g., -prefix ../): "
+            echo -n "Please input configure option (e.g., -local): "
             read option
             ./configure ${option}
             make world
