@@ -12,6 +12,27 @@ CoFixpoint echo_server_behavior : behavior :=
              become echo_server_behavior
            | _ => become echo_server_behavior
          end).
+(* これを Erlang に抽出すると以下のようになる。
+ *
+ * echo_server_behavior() ->
+ *     receive
+ *         Msg ->
+ *             case Msg of
+ *                 {tuple_msg, {name_msg, Sender}, Content} ->
+ *                     Sender ! Content,
+ *                     echo_server_behavior();
+ *                 _ ->
+ *                     echo_server_behavior()
+ *             end
+ *     end.
+ *
+ * タプルのタグは必要。無かったら、name_msg とか str_msg とかの区別がつかない
+ *
+ * after (timeout のこと) については今はとりあえず考えないけど、絶対必要になる。実装するとしたら receive の引数にタイムアウトまで時間とその場合のアクションを書く感じになると思う。
+ * ただ Coq で時間の概念をどう扱えばいいのかわからない。
+ * 何秒とかに関わらず、メッセージがキューに無かったら非決定的にいつでもタイムアウトの遷移になりうるとか？
+ * それとも意味があるのか微妙だけどステップ数を msec にするとか
+ *)
 
 (* サーバに Hello! というメッセージを送り続ける *)
 (* echo_server に送ったとき、ちゃんと Hello! が返ってきたことを確かめるには？ *)
