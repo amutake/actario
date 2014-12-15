@@ -17,6 +17,7 @@ Install
 
 ```sh
 $ cd /path/to/coq-actor
+$ ./configure
 $ make
 $ make install
 ```

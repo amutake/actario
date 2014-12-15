@@ -2,6 +2,7 @@
 *.glob
 *.v.d
 *.bak
+Makefile
 html
 actor
 coq-8.4pl5
