@@ -38,8 +38,8 @@ diff -u -N -r coq-8.4pl5/plugins/extraction/common.ml coq-8.4pl5+actor/plugins/e
  
 diff -u -N -r coq-8.4pl5/plugins/extraction/erlang.ml coq-8.4pl5+actor/plugins/extraction/erlang.ml
 --- coq-8.4pl5/plugins/extraction/erlang.ml	1970-01-01 09:00:00.000000000 +0900
-+++ coq-8.4pl5+actor/plugins/extraction/erlang.ml	2014-12-15 21:42:11.000000000 +0900
-@@ -0,0 +1,240 @@
++++ coq-8.4pl5+actor/plugins/extraction/erlang.ml	2014-12-15 22:17:19.000000000 +0900
+@@ -0,0 +1,242 @@
 +open Pp
 +open Names
 +open Nameops
@@ -88,7 +88,12 @@ diff -u -N -r coq-8.4pl5/plugins/extraction/erlang.ml coq-8.4pl5+actor/plugins/e
 +  | ErlSeq (e1, e2) -> pp_erl_expr e1 ++ str "," ++ fnl () ++ pp_erl_expr e2
 +  | ErlBind (var, e) -> pp_erl_var var ++ str " = " ++ pp_erl_expr e
 +  | ErlLam (args, body) -> str "fun" ++ pp_erl_args pp_erl_var args ++ str " -> " ++ pp_erl_expr body
-+  | ErlApp (f, args) -> pp_par true (pp_erl_expr f) ++ pp_erl_args pp_erl_expr args
++  | ErlApp (f, args) ->
++     let non_atom = match f with
++       | ErlAtom _ -> false
++       | _ -> true
++     in
++     pp_par non_atom (pp_erl_expr f) ++ pp_erl_args pp_erl_expr args
 +  | ErlCase (e, bs) ->
 +     str "case " ++ pp_erl_expr e ++ str " of" ++ fnl () ++
 +       str "    " ++ hov 0 (prlist_with_sep (fun () -> str ";" ++ fnl ()) pp_erl_branch bs) ++ fnl () ++
@@ -145,11 +150,8 @@ diff -u -N -r coq-8.4pl5/plugins/extraction/erlang.ml coq-8.4pl5+actor/plugins/e
 +(* pp_branch : env -> ml_branch -> erl_branch *)
 +let rec conv_branch env = function
 +  | (ids, pat, a) ->
-+     let ids', env' = push_vars (List.rev_map id_of_mlid ids) env in
++     let ids', env = push_vars (List.rev (map_id ids)) env in
 +     (conv_pattern env (List.length ids) pat, conv_expr env a)
-+
-+(* pp_branches : env -> ml_branch array -> std_ppcmds *)
-+and conv_branches env pats = Array.to_list (Array.map (conv_branch env) pats)
 +
 +(* pp_fix : env -> identifier array -> ml_ast array -> std_ppcmds *)
 +(* https://twitter.com/ajiyoshi/status/544349185525297152 *)
@@ -197,8 +199,8 @@ diff -u -N -r coq-8.4pl5/plugins/extraction/erlang.ml coq-8.4pl5+actor/plugins/e
 +(* pp_expr : env -> ml_ast -> erl_expr *)
 +and conv_expr env = function
 +  | MLrel n ->                  (* 環境から de Bruijn index で入れた変数名を取り出す *)
-+     (* let id = get_db_name n env in *)
-+     let id = id_of_string "REL" in
++     let id = get_db_name n env in
++     (* let id = id_of_string ("REL" ^ (string_of_int n)) in *)
 +     ErlVar (MkVar id)           (* ここで出てくるのは変数名しかないよね？ *)
 +  | MLapp (f, args) ->         (* 関数適用 *)
 +     let f = conv_expr env f in
