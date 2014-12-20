@@ -51,6 +51,9 @@ Definition echo_init_system : config :=
          become empty_behv (* それ以降は何もしない *)
        ).
 
+ActorExtraction empty_behv.
 ActorExtraction echo_server_behavior.
 ActorExtraction echo_client_behavior.
 ActorExtraction echo_init_system.
+Recursive ActorExtraction echo_init_system.
+ActorExtraction "echo.erl" echo_init_system.

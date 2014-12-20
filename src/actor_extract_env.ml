@@ -397,7 +397,7 @@ let mono_filename f =
 	  else f
 	in
 	let id =
-	  if lang () <> Haskell then default_id
+	  if lang () <> Haskell && lang () <> Erlang then default_id
 	  else
             try id_of_string (Filename.basename f)
 	    with e when Errors.noncritical e ->
