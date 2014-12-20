@@ -194,14 +194,30 @@ and conv_expr env = function
             | _ -> assert false
           in
           ErlReceive (List.map lam_branch es)
-       (* new behv cont => cont(spawn(fun () -> behv() end)) *)
-       | "New" -> ErlApp (List.nth es 1,
-                          [ErlApp (ErlAtom (MkAtom "spawn"),
-                                   [ErlLam ([], List.hd es)])])
+       (* new behv (fun x => body) => X = spawn(fun () -> behv() end), body *)
+       | "New" ->
+          begin
+            match List.nth es 1 with
+            | ErlLam (args, body) ->
+               ErlSeq (ErlBind (List.hd args,
+                                ErlApp (ErlAtom (MkAtom "spawn"),
+                                        [ErlLam ([], List.hd es)])),
+                       body)
+            | _ -> assert false
+          end
        | "Send" -> ErlSeq (ErlOp (MkAtom "!", List.hd es, List.nth es 1), List.nth es 2)
        (* become (behavior arg1 arg2) => behavior(arg1, arg2) *)
        | "Become" -> List.hd es
-       | "Self" -> ErlApp (List.hd es, [ErlApp (ErlAtom (MkAtom "self"), [])])
+       (* self (fun me => body) => Me = self(), body *)
+       | "Self" ->
+          begin
+            match List.hd es with
+            | ErlLam (args, body) ->
+               ErlSeq (ErlBind (List.hd args,
+                                ErlApp (ErlAtom (MkAtom "self"), [])),
+                       body)
+            | _ -> assert false
+          end
        | _ -> ErlTuple (ErlAtom (MkAtom cstr) :: es)
      end
   | MLtuple asts ->             (* タプル *)
