@@ -21,7 +21,7 @@ open Actor_extract_env
 
 let pr_mlname _ _ _ s = spc () ++ qs s
 
-ARGUMENT EXTEND mlname
+ARGUMENT EXTEND actor_mlname
   TYPED AS string
   PRINTED BY pr_mlname
 | [ preident(id) ] -> [ id ]
@@ -32,8 +32,8 @@ let pr_int_or_id _ _ _ = function
   | ArgInt i -> int i
   | ArgId id -> pr_id id
 
-ARGUMENT EXTEND int_or_id
-  TYPED AS int_or_id
+ARGUMENT EXTEND actor_int_or_id
+  TYPED AS actor_int_or_id
   PRINTED BY pr_int_or_id
 | [ preident(id) ] -> [ ArgId (id_of_string id) ]
 | [ integer(i) ] -> [ ArgInt i ]
@@ -44,7 +44,7 @@ let pr_language = function
   | Haskell -> str "Haskell"
   | Scheme -> str "Scheme"
 
-VERNAC ARGUMENT EXTEND language
+VERNAC ARGUMENT EXTEND actor_language
 PRINTED BY pr_language
 | [ "Ocaml" ] -> [ Ocaml ]
 | [ "Haskell" ] -> [ Haskell ]
@@ -82,7 +82,7 @@ END
 
 (* Target Language *)
 VERNAC COMMAND EXTEND ExtractionLanguage
-| [ "Extraction" "Language" language(l) ]
+| [ "Extraction" "Language" actor_language(l) ]
   -> [ extraction_language l ]
 END
 
@@ -109,7 +109,7 @@ END
 
 VERNAC COMMAND EXTEND ExtractionImplicit
 (* Custom implicit arguments of some csts/inds/constructors *)
-| [ "Extraction" "Implicit" global(r) "[" int_or_id_list(l) "]" ]
+| [ "Extraction" "Implicit" global(r) "[" actor_int_or_id_list(l) "]" ]
   -> [ extraction_implicit r l ]
 END
 
@@ -132,17 +132,17 @@ END
 
 (* Overriding of a Coq object by an ML one *)
 VERNAC COMMAND EXTEND ExtractionConstant
-| [ "Extract" "Constant" global(x) string_list(idl) "=>" mlname(y) ]
+| [ "Extract" "Constant" global(x) string_list(idl) "=>" actor_mlname(y) ]
   -> [ extract_constant_inline false x idl y ]
 END
 
 VERNAC COMMAND EXTEND ExtractionInlinedConstant
-| [ "Extract" "Inlined" "Constant" global(x) "=>" mlname(y) ]
+| [ "Extract" "Inlined" "Constant" global(x) "=>" actor_mlname(y) ]
   -> [ extract_constant_inline true x [] y ]
 END
 
 VERNAC COMMAND EXTEND ExtractionInductive
 | [ "Extract" "Inductive" global(x) "=>"
-    mlname(id) "[" mlname_list(idl) "]" string_opt(o) ]
+    actor_mlname(id) "[" actor_mlname_list(idl) "]" string_opt(o) ]
   -> [ extract_inductive x id idl o ]
 END
