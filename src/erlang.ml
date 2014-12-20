@@ -150,7 +150,7 @@ let conv_cons es = function
 let rec conv_branch env = function
   | (ids, pat, a) ->
      let ids', env = push_vars (List.rev (map_id ids)) env in
-     (conv_pattern env (List.length ids) pat, conv_expr env a)
+     (conv_pattern env (List.length ids) pat, conv_expr true env a)
 
 (* pp_fix : env -> identifier array -> ml_ast array -> std_ppcmds *)
 (* https://twitter.com/ajiyoshi/status/544349185525297152 *)
@@ -176,7 +176,7 @@ and conv_fix_one env ex_args fix_id def =
   let args, body = collect_lams def in
   let args', env' = push_vars (List.rev (map_id args)) env in
   let ex_args', env'' = push_vars (List.rev ex_args) env' in
-  let erl_body = conv_expr env'' body in
+  let erl_body = conv_expr true env'' body in
   ErlBind (MkVar fix_id, ErlLam (List.map (fun v -> MkVar v) (ex_args' @ args'), erl_body))
 
 and conv_fix_two fix_ids id fix_id def =
@@ -196,38 +196,44 @@ and conv_fix env ids defs =
   conv_list_seq (binds @ binds')
 
 (* pp_expr : bool -> env -> ml_ast -> erl_expr *)
-and conv_expr env = function
+(* 最初の引数は、関数名が出てきたらゼロ引数関数として扱うかどうか *)
+(* これをするとアドホックな実装になってしまうので、ちゃんとやるとしたら MiniML を改造して、関数名に対して引数の数の情報を足したりとかしないといけないと思う *)
+and conv_expr zero env = function
   | MLrel n ->                  (* 環境から de Bruijn index で入れた変数名を取り出す *)
      let id = get_db_name n env in
      (* let id = id_of_string ("REL" ^ (string_of_int n)) in *)
      ErlVar (MkVar id)           (* ここで出てくるのは変数名しかないよね？ *)
   | MLapp (f, args) ->         (* 関数適用 *)
-     let f = conv_expr env f in
-     let args = List.map (conv_expr env) args in
+     let f = conv_expr false env f in (* ここだけ zero = false *)
+     let args = List.map (conv_expr true env) args in
      ErlApp (f, args)
   | MLlam _ as a ->             (* 無名関数 *)
      let args, a' = collect_lams a in (* fun x -> fun y -> ... -> t を fun x y ... -> t にする *)
      let args, env' = push_vars (List.rev (map_id args)) env in (* 環境に入れる *)
      let args = List.map (fun v -> MkVar v) args in
-     ErlLam (args, conv_expr env' a')
+     ErlLam (args, conv_expr true env' a')
   | MLletin (id, a1, a2) ->     (* 局所束縛 *)
      let i, env' = push_vars [id_of_mlid id] env in
      let var = MkVar (List.hd i) in
-     let erl_a1 = conv_expr env a1 in
-     let erl_a2 = conv_expr env' a2 in
+     let erl_a1 = conv_expr true env a1 in
+     let erl_a2 = conv_expr true env' a2 in
      ErlSeq (ErlBind (var, erl_a1), erl_a2)
   | MLglob r -> (* ??? トップレベルに定義してる名前とか？ *)
-     ErlFunName (MkAtom (pp_global Term r))
+     let f = ErlFunName (MkAtom (pp_global Term r)) in
+     if zero then
+       ErlApp (f, [])
+     else
+       f
   | MLcons (_, r, asts) ->      (* MLcons (型, コンストラクタ名, 引数) だと思う、たぶん *)
      let cstr = pp_global Cons r in
-     let es = List.map (conv_expr env) asts in
+     let es = List.map (conv_expr true env) asts in
      (* ここを actions と behavior のコンストラクタのときだけ別なように処理すればいい *)
      conv_cons es cstr
   | MLtuple asts ->             (* タプル *)
-     let es = List.map (conv_expr env) asts in
+     let es = List.map (conv_expr true env) asts in
      ErlTuple es
   | MLcase (_, a, pats) ->      (* パターンマッチ *)
-     let a = conv_expr env a in
+     let a = conv_expr true env a in
      let bls = List.map (conv_branch env) (Array.to_list pats) in
      ErlCase (a, bls)
   | MLfix (i, ids, defs) ->     (* 相互再帰 let rec f a = ... g ... and g a = ... g ... in ... *)
@@ -237,7 +243,7 @@ and conv_expr env = function
      ErlThrow (ErlString s)
   | MLdummy -> ErlAtom (MkAtom "__")         (* ??? *)
   | MLaxiom -> ErlThrow (ErlString "axiom")
-  | MLmagic a -> conv_expr env a  (* erlang に magic に対応するものってあんの *)
+  | MLmagic a -> conv_expr true env a  (* erlang に magic に対応するものってあんの *)
 
 (* preamble : identifier -> module_path list -> unsafe_needs -> std_ppcmds *)
 (* preamble で -export([Function1/Arity1,..,FunctionN/ArityN]) を出力したいが、関数名の情報は入力に含まれないので、モジュール名だけ出力する *)
@@ -260,7 +266,7 @@ let conv_function r lam =
   let args, body = collect_lams lam in
   let args, env = push_vars (map_id args) (empty_env ()) in
   let args = List.map (fun v -> MkVar v) (List.rev args) in
-  let body = conv_expr env body in
+  let body = conv_expr true env body in
   ErlFun (fname, args, body)
 
 let pp_decl = function
