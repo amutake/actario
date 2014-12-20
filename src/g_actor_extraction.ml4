@@ -47,9 +47,6 @@ let pr_language = function
 
 VERNAC ARGUMENT EXTEND actor_language
 PRINTED BY pr_language
-| [ "Ocaml" ] -> [ Ocaml ]
-| [ "Haskell" ] -> [ Haskell ]
-| [ "Scheme" ] -> [ Scheme ]
 | [ "Erlang" ] -> [ Erlang ]
 END
 
