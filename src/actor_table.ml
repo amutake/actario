@@ -443,8 +443,8 @@ let my_bool_option name initval =
   let _ = declare_bool_option
     {optsync = true;
      optdepr = false;
-     optname = "Extraction "^name;
-     optkey = ["Extraction"; name];
+     optname = "ActorExtraction "^name;
+     optkey = ["ActorExtraction"; name];
      optread = access;
      optwrite = (:=) flag }
   in
@@ -516,16 +516,16 @@ let optims () = !opt_flag_ref
 let _ = declare_bool_option
 	  {optsync = true;
            optdepr = false;
-	   optname = "Extraction Optimize";
-	   optkey = ["Extraction"; "Optimize"];
+	   optname = "ActorExtraction Optimize";
+	   optkey = ["ActorExtraction"; "Optimize"];
 	   optread = (fun () -> !int_flag_ref <> 0);
 	   optwrite = (fun b -> chg_flag (if b then int_flag_init else 0))}
 
 let _ = declare_int_option
           { optsync = true;
             optdepr = false;
-            optname = "Extraction Flag";
-            optkey = ["Extraction";"Flag"];
+            optname = "ActorExtraction Flag";
+            optkey = ["ActorExtraction";"Flag"];
             optread = (fun _ -> Some !int_flag_ref);
             optwrite = (function
                           | None -> chg_flag 0
