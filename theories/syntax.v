@@ -1,3 +1,5 @@
+Declare ML Module "actor_extraction_plugin".
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 

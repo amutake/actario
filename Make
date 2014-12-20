@@ -1,4 +1,21 @@
+-I src
 -R theories Actor
+
+src/actor_table.ml
+src/actor_table.mli
+src/actor_mlutil.ml
+src/actor_mlutil.mli
+src/actor_modutil.ml
+src/actor_modutil.mli
+src/actor_extraction.ml
+src/actor_extraction.mli
+src/actor_common.ml
+src/actor_common.mli
+src/actor_extract_env.ml
+src/actor_extract_env.mli
+src/g_actor_extraction.ml4
+src/actor_extraction_plugin.mllib
+
 theories/util.v
 theories/syntax.v
 theories/name_dec.v

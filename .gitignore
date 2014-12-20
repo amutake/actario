@@ -1,6 +1,25 @@
+# Coq
 *.vo
 *.glob
 *.v.d
+
+# OCaml
+*.a
+*.o
+*.cma
+*.cmi
+*.cmo
+*.cmt
+*.cmti
+*.cmx
+*.cmxa
+*.cmxs
+*.ml.d
+*.mli.d
+*.mllib.d
+*.ml4.d
+
+# Others
 *.bak
 Makefile
 html

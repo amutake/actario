@@ -17,6 +17,7 @@ open Libnames
 open Actor_table
 open Miniml
 open Actor_table
+open Actor_mlutil
 open Actor_modutil
 open Mod_subst
 
