@@ -570,6 +570,7 @@ let pp_global k r =
       | Scheme -> unquote s (* no modular Scheme extraction... *)
       | Haskell -> if modular () then pp_haskell_gen k mp rls else s
       | Ocaml -> pp_ocaml_gen k mp rls (Some l)
+      | Erlang -> s
 
 (* The next function is used only in Ocaml extraction...*)
 

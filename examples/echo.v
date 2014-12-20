@@ -50,3 +50,5 @@ Definition echo_init_system : config :=
          client ! empty_msg; (* クライアントを走らせる *)
          become empty_behv (* それ以降は何もしない *)
        ).
+
+ActorExtraction echo_server_behavior.

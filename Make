@@ -11,6 +11,8 @@ src/actor_extraction.ml
 src/actor_extraction.mli
 src/actor_common.ml
 src/actor_common.mli
+src/erlang.ml
+src/erlang.mli
 src/actor_extract_env.ml
 src/actor_extract_env.mli
 src/g_actor_extraction.ml4

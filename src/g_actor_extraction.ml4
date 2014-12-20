@@ -43,12 +43,14 @@ let pr_language = function
   | Ocaml -> str "Ocaml"
   | Haskell -> str "Haskell"
   | Scheme -> str "Scheme"
+  | Erlang -> str "Erlang"
 
 VERNAC ARGUMENT EXTEND actor_language
 PRINTED BY pr_language
 | [ "Ocaml" ] -> [ Ocaml ]
 | [ "Haskell" ] -> [ Haskell ]
 | [ "Scheme" ] -> [ Scheme ]
+| [ "Erlang" ] -> [ Erlang ]
 END
 
 (* Extraction commands *)
