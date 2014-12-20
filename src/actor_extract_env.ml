@@ -13,10 +13,10 @@ open Libnames
 open Pp
 open Util
 open Miniml
-open Table
-open Extraction
-open Modutil
-open Common
+open Actor_table
+open Actor_extraction
+open Actor_modutil
+open Actor_common
 open Mod_subst
 
 (***************************************)
@@ -455,7 +455,7 @@ let print_structure_to_file (fn,si,mo) dry struc =
   reset_renaming_tables AllButExternal;
   let unsafe_needs = {
     mldummy = struct_ast_search ((=) MLdummy) struc;
-    tdummy = struct_type_search Mlutil.isDummy struc;
+    tdummy = struct_type_search Actor_mlutil.isDummy struc;
     tunknown = struct_type_search ((=) Tunknown) struc;
     magic =
       if lang () <> Haskell then false

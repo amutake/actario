@@ -12,8 +12,8 @@ open Environ
 open Libnames
 open Util
 open Miniml
-open Table
-open Mlutil
+open Actor_table
+open Actor_mlutil
 open Mod_subst
 
 (*S Functions upon ML modules. *)

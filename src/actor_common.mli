@@ -9,7 +9,7 @@
 open Names
 open Libnames
 open Miniml
-open Mlutil
+open Actor_mlutil
 open Pp
 
 (** By default, in module Format, you can do horizontal placing of blocks

@@ -12,7 +12,7 @@ open Util
 open Names
 open Libnames
 open Nametab
-open Table
+open Actor_table
 open Miniml
 (*i*)
 
@@ -276,7 +276,7 @@ let type_expand env t =
 	   | None -> Tglob (r, List.map expand l))
     | Tarr (a,b) -> Tarr (expand a, expand b)
     | a -> a
-  in if Table.type_expand () then expand t else t
+  in if Actor_table.type_expand () then expand t else t
 
 let type_simpl = type_expand (fun _ -> None)
 
@@ -1357,4 +1357,3 @@ let inline r t =
   && (to_inline r (* The user DOES want to inline it *)
      || (lang () <> Haskell && not (is_projection r) &&
          (is_recursor r || manual_inline r || inline_test r t)))
-

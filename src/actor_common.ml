@@ -14,10 +14,10 @@ open Declarations
 open Namegen
 open Nameops
 open Libnames
-open Table
+open Actor_table
 open Miniml
-open Mlutil
-open Modutil
+open Actor_table
+open Actor_modutil
 open Mod_subst
 
 let string_of_id id =

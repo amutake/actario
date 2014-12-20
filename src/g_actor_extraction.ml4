@@ -16,8 +16,8 @@ open Genarg
 open Pp
 open Names
 open Nameops
-open Table
-open Extract_env
+open Actor_table
+open Actor_extract_env
 
 let pr_mlname _ _ _ s = spc () ++ qs s
 
