@@ -40,7 +40,8 @@ Definition factorial_system (n : nat) : config :=
          become empty_behv
        ).
 
-Recursive Extraction factorial_system.
+Recursive ActorExtraction factorial_system.
+ActorExtraction "factorial" factorial_system.
 
 Open Scope string_scope.
 
