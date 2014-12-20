@@ -33,6 +33,10 @@ and erl_branch = erl_expr * erl_expr
 (* トップレベルパターンマッチはしない *)
 type erl_decl = ErlFun of erl_atom * erl_var list * erl_expr
 
+(* for debugging *)
+
+let debug s = str ("[debug:" ^ s ^ "]") ++ fnl ()
+
 (* Pretty Printers for Erlang AST *)
 
 let pp_erl_var = function
@@ -255,31 +259,56 @@ and conv_expr zero env = function
 let preamble mod_name used_modules usf =
   str "-module(" ++ pr_id mod_name ++ str ")." ++ fnl2 ()
 
-(* Recursive Extraction のときに使われるっぽい *)
-let pp_struct = function
-  | _ -> str "[pp_struct]"
-
 (* haskell.ml の pp_function とほぼおなじ *)
 (* pp_function : global_reference -> ml_ast -> std_ppcmds *)
 let conv_function r lam =
-  let fname = MkAtom (pp_global Term r) in
-  (* collect_lams は mlutil.ml に定義されてて、
-   * fun x -> fun y -> fun z -> ... -> t みたいなのを、
-   * ([ x; y; z; ... ], t) にする
-   *)
-  let args, body = collect_lams lam in
-  let args, env = push_vars (map_id args) (empty_env ()) in
-  let args = List.map (fun v -> MkVar v) (List.rev args) in
-  let body = conv_expr true env body in
-  ErlFun (fname, args, body)
+  let fnamestr = pp_global Term r in
+  (* init だけ特別扱い (抽出しない) *)
+  if fnamestr = "init" then None else
+    let fname = MkAtom fnamestr in
+    (* collect_lams は mlutil.ml に定義されてて、
+     * fun x -> fun y -> fun z -> ... -> t みたいなのを、
+     * ([ x; y; z; ... ], t) にする
+     *)
+    let args, body = collect_lams lam in
+    let args, env = push_vars (map_id args) (empty_env ()) in
+    let args = List.map (fun v -> MkVar v) (List.rev args) in
+    let body = conv_expr true env body in
+    Some (ErlFun (fname, args, body))
 
 let pp_decl = function
   | Dind (_, _) -> mt ()        (* Inductive は何も出力しない *)
   | Dtype (_, _, _) -> mt ()    (* Type alias は何も出力しない *)
-  | Dterm (r, ast, _) -> pp_erl_decl (conv_function r ast)        (* 普通の関数定義 *)
+  | Dterm (r, ast, _) ->        (* 普通の関数定義 *)
+     begin
+       match conv_function r ast with
+       | Some d -> pp_erl_decl d
+       | None -> mt ()
+     end
   | Dfix (rv, defv, _) ->    (* 相互再帰 (Erlang はトップレベルは相互再帰可能なので Dterm のときと同じ) *)
      let _ = assert (Array.length rv == Array.length defv) in
-     prvect (fun (r, def) -> pp_erl_decl (conv_function r def)) (array_zip rv defv)
+     let pp = function
+       | Some d -> pp_erl_decl d
+       | None -> mt ()
+     in
+     prvect (fun (r, def) -> pp (conv_function r def)) (array_zip rv defv)
+
+let pp_structure_elem = function
+  | SEdecl d -> pp_decl d
+  | SEmodule _ | SEmodtype _ -> mt ()
+
+let pp_module_structure =
+  prlist_strict (fun (_, e) -> pp_structure_elem e)
+
+(* Recursive Extraction のときに使われるっぽい *)
+let pp_struct =
+  let pp_sel (mp, sel) =
+    push_visible mp [];
+    let p = pp_module_structure sel in
+    pop_visible ();
+    p
+  in
+  prlist_strict pp_sel
 
 let erlang_descr = {
   keywords = keywords;
