@@ -25,6 +25,7 @@ type erl_expr =
   | ErlListCons of erl_expr * erl_expr    (* [a | b] *)
   | ErlVar of erl_var     (*  *)
   | ErlAtom of erl_atom   (* 'atom', 関数名も''でつつんでいいっぽい *)
+  | ErlFunName of erl_atom      (* ゼロ引数関数とアトムを区別するために定義 *)
   | ErlString of string   (* "str" *)
 
 and erl_branch = erl_expr * erl_expr
@@ -50,11 +51,11 @@ let rec pp_erl_expr = function
        str "    " ++ hov 0 (pp_erl_expr body) ++ fnl () ++
        str "end"
   | ErlApp (f, args) ->
-     let non_atom = match f with
-       | ErlAtom _ -> false
+     let non_fun = match f with
+       | ErlFunName _ -> false
        | _ -> true
      in
-     pp_par non_atom (pp_erl_expr f) ++ pp_erl_args pp_erl_expr args
+     pp_par non_fun (pp_erl_expr f) ++ pp_erl_args pp_erl_expr args
   | ErlOp (op, arg1, arg2) ->
      pp_erl_expr arg1 ++ str " " ++ pp_erl_atom op ++ str " " ++ pp_erl_expr arg2
   | ErlCase (e, bs) ->
@@ -71,6 +72,7 @@ let rec pp_erl_expr = function
   | ErlListCons (h, t) -> str "[ " ++ pp_erl_expr h ++ str " | " ++ pp_erl_expr t ++ str " ]"
   | ErlVar v -> pp_erl_var v
   | ErlAtom a -> pp_erl_atom a
+  | ErlFunName n -> pp_erl_atom n
   | ErlString s -> str "\"" ++ str s ++ str "\""
 
 and pp_erl_branch (pat, body) =
@@ -109,6 +111,40 @@ let rec conv_pattern env num = function
      let rec n_to_1 n = if n < 1 then [] else n :: n_to_1 (n - 1) in
      let pats = List.map (fun n -> Prel n) (n_to_1 num) in
      conv_pattern env num (Pcons (r, pats))
+
+(* Special treatment for Actor primitives *)
+let conv_cons es = function
+  | "Receive" ->
+     let lam_branch = function
+       | ErlLam (args, body) -> (ErlVar (List.hd args), body)
+       | _ -> assert false
+     in
+     ErlReceive (List.map lam_branch es)
+  (* new behv (fun x => body) => X = spawn(fun () -> behv() end), body *)
+  | "New" ->
+     begin
+       match List.nth es 1 with
+       | ErlLam (args, body) ->
+          ErlSeq (ErlBind (List.hd args,
+                           ErlApp (ErlFunName (MkAtom "spawn"),
+                                   [ErlLam ([], List.hd es)])),
+                  body)
+       | _ -> assert false
+     end
+  | "Send" -> ErlSeq (ErlOp (MkAtom "!", List.hd es, List.nth es 1), List.nth es 2)
+  (* become (behavior arg1 arg2) => behavior(arg1, arg2) *)
+  | "Become" -> List.hd es
+  (* self (fun me => body) => Me = self(), body *)
+  | "Self" ->
+     begin
+       match List.hd es with
+       | ErlLam (args, body) ->
+          ErlSeq (ErlBind (List.hd args,
+                           ErlApp (ErlFunName (MkAtom "self"), [])),
+                  body)
+       | _ -> assert false
+     end
+  | cstr -> ErlTuple (ErlAtom (MkAtom cstr) :: es)
 
 (* pp_branch : env -> ml_branch -> erl_branch *)
 let rec conv_branch env = function
@@ -159,7 +195,7 @@ and conv_fix env ids defs =
   let binds' = List.map (fun (id, def) -> conv_fix_two fix_ids id (to_fix id) def) zipped in
   conv_list_seq (binds @ binds')
 
-(* pp_expr : env -> ml_ast -> erl_expr *)
+(* pp_expr : bool -> env -> ml_ast -> erl_expr *)
 and conv_expr env = function
   | MLrel n ->                  (* 環境から de Bruijn index で入れた変数名を取り出す *)
      let id = get_db_name n env in
@@ -181,45 +217,12 @@ and conv_expr env = function
      let erl_a2 = conv_expr env' a2 in
      ErlSeq (ErlBind (var, erl_a1), erl_a2)
   | MLglob r -> (* ??? トップレベルに定義してる名前とか？ *)
-     ErlAtom (MkAtom (pp_global Term r))
+     ErlFunName (MkAtom (pp_global Term r))
   | MLcons (_, r, asts) ->      (* MLcons (型, コンストラクタ名, 引数) だと思う、たぶん *)
      let cstr = pp_global Cons r in
      let es = List.map (conv_expr env) asts in
      (* ここを actions と behavior のコンストラクタのときだけ別なように処理すればいい *)
-     begin
-       match cstr with
-       | "Receive" ->
-          let lam_branch = function
-            | ErlLam (args, body) -> (ErlVar (List.hd args), body)
-            | _ -> assert false
-          in
-          ErlReceive (List.map lam_branch es)
-       (* new behv (fun x => body) => X = spawn(fun () -> behv() end), body *)
-       | "New" ->
-          begin
-            match List.nth es 1 with
-            | ErlLam (args, body) ->
-               ErlSeq (ErlBind (List.hd args,
-                                ErlApp (ErlAtom (MkAtom "spawn"),
-                                        [ErlLam ([], List.hd es)])),
-                       body)
-            | _ -> assert false
-          end
-       | "Send" -> ErlSeq (ErlOp (MkAtom "!", List.hd es, List.nth es 1), List.nth es 2)
-       (* become (behavior arg1 arg2) => behavior(arg1, arg2) *)
-       | "Become" -> List.hd es
-       (* self (fun me => body) => Me = self(), body *)
-       | "Self" ->
-          begin
-            match List.hd es with
-            | ErlLam (args, body) ->
-               ErlSeq (ErlBind (List.hd args,
-                                ErlApp (ErlAtom (MkAtom "self"), [])),
-                       body)
-            | _ -> assert false
-          end
-       | _ -> ErlTuple (ErlAtom (MkAtom cstr) :: es)
-     end
+     conv_cons es cstr
   | MLtuple asts ->             (* タプル *)
      let es = List.map (conv_expr env) asts in
      ErlTuple es
