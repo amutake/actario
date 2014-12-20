@@ -206,7 +206,11 @@ and conv_expr zero env = function
   | MLapp (f, args) ->         (* 関数適用 *)
      let f = conv_expr false env f in (* ここだけ zero = false *)
      let args = List.map (conv_expr true env) args in
-     ErlApp (f, args)
+     begin
+       match f with
+       | ErlFunName (MkAtom "init") -> List.nth args 1
+       | _ -> ErlApp (f, args)
+     end
   | MLlam _ as a ->             (* 無名関数 *)
      let args, a' = collect_lams a in (* fun x -> fun y -> ... -> t を fun x y ... -> t にする *)
      let args, env' = push_vars (List.rev (map_id args)) env in (* 環境に入れる *)
