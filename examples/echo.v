@@ -52,3 +52,5 @@ Definition echo_init_system : config :=
        ).
 
 ActorExtraction echo_server_behavior.
+ActorExtraction echo_client_behavior.
+ActorExtraction echo_init_system.

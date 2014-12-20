@@ -16,6 +16,7 @@ type erl_expr =
   | ErlBind of erl_var * erl_expr (* Var = ... *)
   | ErlLam of erl_var list * erl_expr (* fun(A, B, ...) -> ... end *)
   | ErlApp of erl_expr * erl_expr list (* 'f'(A), F(A, B, C), (fun X -> X)(A) など *)
+  | ErlOp of erl_atom * erl_expr * erl_expr       (* A + B など *)
   | ErlCase of erl_expr * erl_branch list (* case ... of ... -> ...; ... -> ... end *)
   | ErlReceive of erl_branch list        (* receive ... -> ...; ... -> ... end *)
   | ErlThrow of erl_expr                 (* throw(e) *)
@@ -44,13 +45,18 @@ let pp_erl_args f args =
 let rec pp_erl_expr = function
   | ErlSeq (e1, e2) -> pp_erl_expr e1 ++ str "," ++ fnl () ++ pp_erl_expr e2
   | ErlBind (var, e) -> pp_erl_var var ++ str " = " ++ pp_erl_expr e
-  | ErlLam (args, body) -> str "fun" ++ pp_erl_args pp_erl_var args ++ str " -> " ++ pp_erl_expr body
+  | ErlLam (args, body) ->
+     str "fun" ++ pp_erl_args pp_erl_var args ++ str " ->" ++ fnl () ++
+       str "    " ++ hov 0 (pp_erl_expr body) ++ fnl () ++
+       str "end"
   | ErlApp (f, args) ->
      let non_atom = match f with
        | ErlAtom _ -> false
        | _ -> true
      in
      pp_par non_atom (pp_erl_expr f) ++ pp_erl_args pp_erl_expr args
+  | ErlOp (op, arg1, arg2) ->
+     pp_erl_expr arg1 ++ str " " ++ pp_erl_atom op ++ str " " ++ pp_erl_expr arg2
   | ErlCase (e, bs) ->
      str "case " ++ pp_erl_expr e ++ str " of" ++ fnl () ++
        str "    " ++ hov 0 (prlist_with_sep (fun () -> str ";" ++ fnl ()) pp_erl_branch bs) ++ fnl () ++
@@ -177,10 +183,27 @@ and conv_expr env = function
   | MLglob r -> (* ??? トップレベルに定義してる名前とか？ *)
      ErlAtom (MkAtom (pp_global Term r))
   | MLcons (_, r, asts) ->      (* MLcons (型, コンストラクタ名, 引数) だと思う、たぶん *)
-     let c = ErlAtom (MkAtom (pp_global Cons r)) in
+     let cstr = pp_global Cons r in
      let es = List.map (conv_expr env) asts in
      (* ここを actions と behavior のコンストラクタのときだけ別なように処理すればいい *)
-     ErlTuple (c :: es)
+     begin
+       match cstr with
+       | "Receive" ->
+          let lam_branch = function
+            | ErlLam (args, body) -> (ErlVar (List.hd args), body)
+            | _ -> assert false
+          in
+          ErlReceive (List.map lam_branch es)
+       (* new behv cont => cont(spawn(fun () -> behv() end)) *)
+       | "New" -> ErlApp (List.nth es 1,
+                          [ErlApp (ErlAtom (MkAtom "spawn"),
+                                   [ErlLam ([], List.hd es)])])
+       | "Send" -> ErlSeq (ErlOp (MkAtom "!", List.hd es, List.nth es 1), List.nth es 2)
+       (* become (behavior arg1 arg2) => behavior(arg1, arg2) *)
+       | "Become" -> List.hd es
+       | "Self" -> ErlApp (List.hd es, [ErlApp (ErlAtom (MkAtom "self"), [])])
+       | _ -> ErlTuple (ErlAtom (MkAtom cstr) :: es)
+     end
   | MLtuple asts ->             (* タプル *)
      let es = List.map (conv_expr env) asts in
      ErlTuple es
