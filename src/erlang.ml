@@ -257,7 +257,7 @@ and conv_expr zero env = function
 (* preamble で -export([Function1/Arity1,..,FunctionN/ArityN]) を出力したいが、関数名の情報は入力に含まれないので、モジュール名だけ出力する *)
 (* preamble の入力に関数名と引数の数が含まれるようなものを渡すように改造したほうがいいかもしれない *)
 let preamble mod_name used_modules usf =
-  str "-module(" ++ pr_id mod_name ++ str ")." ++ fnl2 ()
+  str "-module(" ++ str (String.uncapitalize (string_of_id mod_name)) ++ str ")." ++ fnl ()
 
 (* haskell.ml の pp_function とほぼおなじ *)
 (* pp_function : global_reference -> ml_ast -> std_ppcmds *)
@@ -300,15 +300,56 @@ let pp_structure_elem = function
 let pp_module_structure =
   prlist_strict (fun (_, e) -> pp_structure_elem e)
 
+let name_arity_module el =
+  let name_arity_function r lam =
+    let fname = pp_global Term r in
+    let args, _ = collect_lams lam in
+    (fname, List.length args)
+  in
+  let name_arity_decl = function
+    | Dterm (r, ast, _) -> [name_arity_function r ast]
+    | Dfix (rv, defv, _) ->
+       List.map (fun (r, def) -> name_arity_function r def)
+                (Array.to_list (array_zip rv defv))
+    | _ -> []
+  in
+  let name_arity_structure_elem = function
+    | SEdecl d -> name_arity_decl d
+    | _ -> []
+  in
+  List.flatten (List.map (fun (_, e) -> name_arity_structure_elem e) el)
+
 (* Recursive Extraction のときに使われるっぽい *)
-let pp_struct =
+let pp_struct st =
+  let name_arity_pairs_par_module (mp, sel) =
+    push_visible mp [];
+    let pairs = List.filter (fun (n, _) -> n <> "init") (name_arity_module sel) in
+    pop_visible ();
+    pairs
+  in
+  let exports = List.flatten (List.map name_arity_pairs_par_module st) in
+  let pp_export =
+    str "-export([" ++
+      prlist_with_sep (fun () -> str ", ")
+                      (fun (n, a) -> str n ++ str "/" ++ int a)
+                      exports ++
+      str "])."
+  in
+  let pp_inline =
+    let arity0 = List.filter (fun (_, a) -> a == 0) exports in
+    str "-compile({inline, [" ++
+      prlist_with_sep (fun () -> str ", ")
+                      (fun (n, a) -> str n ++ str "/" ++ int a)
+                      arity0 ++
+      str "]})."
+  in
   let pp_sel (mp, sel) =
     push_visible mp [];
     let p = pp_module_structure sel in
     pop_visible ();
     p
   in
-  prlist_strict pp_sel
+  pp_export ++ fnl () ++ pp_inline ++ fnl2 () ++ prlist_strict pp_sel st
 
 let erlang_descr = {
   keywords = keywords;
