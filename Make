@@ -1,29 +1,29 @@
--I src
--R theories Actor
+-I plugin
+-R src Actor
 
-src/actor_table.ml
-src/actor_table.mli
-src/actor_mlutil.ml
-src/actor_mlutil.mli
-src/actor_modutil.ml
-src/actor_modutil.mli
-src/actor_extraction.ml
-src/actor_extraction.mli
-src/actor_common.ml
-src/actor_common.mli
-src/erlang.ml
-src/erlang.mli
-src/actor_extract_env.ml
-src/actor_extract_env.mli
-src/g_actor_extraction.ml4
-src/actor_extraction_plugin.mllib
+plugin/actor_table.ml
+plugin/actor_table.mli
+plugin/actor_mlutil.ml
+plugin/actor_mlutil.mli
+plugin/actor_modutil.ml
+plugin/actor_modutil.mli
+plugin/actor_extraction.ml
+plugin/actor_extraction.mli
+plugin/actor_common.ml
+plugin/actor_common.mli
+plugin/erlang.ml
+plugin/erlang.mli
+plugin/actor_extract_env.ml
+plugin/actor_extract_env.mli
+plugin/g_actor_extraction.ml4
+plugin/actor_extraction_plugin.mllib
 
-theories/util.v
-theories/syntax.v
-theories/name_dec.v
-theories/semantics.v
-theories/chain.v
-theories/gen_fresh.v
-theories/no_dup.v
-theories/trans_invariant.v
-theories/properties.v
+src/util.v
+src/syntax.v
+src/name_dec.v
+src/semantics.v
+src/chain.v
+src/gen_fresh.v
+src/no_dup.v
+src/trans_invariant.v
+src/properties.v
