@@ -7,3 +7,9 @@ build:
           ./configure
           make
           sudo make install
+    - script:
+        name: build example
+        code: |
+          cd examples
+          ../configure
+          make
