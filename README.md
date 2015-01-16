@@ -1,6 +1,8 @@
 Actor Verification Framework
 ============================
 
+[![wercker status](https://app.wercker.com/status/fd8f4cf437b7230524c5d00e99858456/m "wercker status")](https://app.wercker.com/project/bykey/fd8f4cf437b7230524c5d00e99858456)
+
 This is a framework to formalize and verify Actor systems on Coq.
 
 **There is a possibility to change the repository name**
