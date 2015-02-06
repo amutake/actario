@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import Actor.syntax Actor.semantics.
+Require Import Actario.syntax Actario.semantics.
 
 (* 受け取ったメッセージを送ってきたアクターにそのまま返す *)
 CoFixpoint echo_server_behavior : behavior :=

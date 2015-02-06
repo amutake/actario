@@ -1,11 +1,11 @@
-Actor Verification Framework
-============================
+Actario - Verification Framework for Actor Systems on Coq
+=========================================================
 
 [![wercker status](https://app.wercker.com/status/fd8f4cf437b7230524c5d00e99858456/m "wercker status")](https://app.wercker.com/project/bykey/fd8f4cf437b7230524c5d00e99858456)
 
-This is a framework to formalize and verify Actor systems on Coq.
+Actario is a framework to formalize and verify Actor systems on Coq. **highly development**
 
-**There is a possibility to change the repository name**
+Actario = Actor + Scenario
 
 
 Requirements
@@ -42,6 +42,8 @@ Current status
 - [x] Proof of no duplication of Actor names
     + theories/trans_invariant.v (`initial_trans_star_no_dup`)
 - [ ] Mechanisms/Lemmas to verify Actor systems
-- [ ] Communication between configurations (for distributed systems)
-- [ ] Extraction to Erlang
-- [ ] Supervisor / Monitor / Link
+- [ ] Communication between configurations
+- [x] Extraction to Erlang
+    + Equivalence between Actario's semantics and Erlang's semantics is not proven
+- [ ] Supervisor
+- [ ] Practical examples

@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import List NPeano Actor.syntax Actor.semantics Actor.properties.
+Require Import List NPeano Actario.syntax Actario.semantics Actario.properties.
 Import ListNotations.
 
 (**

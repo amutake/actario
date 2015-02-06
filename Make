@@ -1,5 +1,5 @@
 -I plugin
--R src Actor
+-R src Actario
 
 plugin/actor_table.ml
 plugin/actor_table.mli
