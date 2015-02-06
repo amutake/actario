@@ -1,4 +1,4 @@
-![logo](https://raw.githubusercontent.com/amutake/actario/master/img/logo-mini.png) Actario
+![logo](./img/logo-mini.png) Actario
 =========================================================
 
 [![wercker status](https://app.wercker.com/status/1f0b20fd4377f1065457f7b480919621/s/master "wercker status")](https://app.wercker.com/project/bykey/1f0b20fd4377f1065457f7b480919621)
@@ -7,7 +7,7 @@ Actario is a framework to formalize and verify Actor systems on Coq. **This proj
 
 Actario = Actor + Scenario
 
-<img src="https://raw.githubusercontent.com/amutake/actario/master/img/logo-with-name.png" height=130>
+<img src="./img/logo-with-name.png" height=100>
 
 
 Requirements
