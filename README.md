@@ -1,7 +1,7 @@
 Actario - Verification Framework for Actor Systems on Coq
 =========================================================
 
-[![wercker status](https://app.wercker.com/status/fd8f4cf437b7230524c5d00e99858456/m "wercker status")](https://app.wercker.com/project/bykey/fd8f4cf437b7230524c5d00e99858456)
+[![wercker status](https://app.wercker.com/status/1f0b20fd4377f1065457f7b480919621/m "wercker status")](https://app.wercker.com/project/bykey/1f0b20fd4377f1065457f7b480919621)
 
 Actario is a framework to formalize and verify Actor systems on Coq. **highly development**
 
@@ -47,3 +47,9 @@ Current status
     + Equivalence between Actario's semantics and Erlang's semantics is not proven
 - [ ] Supervisor
 - [ ] Practical examples
+
+
+License
+-------
+
+LGPL 2.1
