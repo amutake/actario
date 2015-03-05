@@ -32,11 +32,10 @@ CoFixpoint factorial_behv : behavior :=
            | _ => become factorial_behv
          end).
 
-Definition factorial_system (n : nat) : config :=
+Definition factorial_system (n : nat) (parent : name) : config :=
   init "factorial" (
          x <- new factorial_behv;
-         me <- self;
-         x ! tuple_msg (nat_msg n) (name_msg me);
+         x ! tuple_msg (nat_msg n) (name_msg parent);
          become empty_behv
        ).
 
@@ -47,8 +46,12 @@ Open Scope string_scope.
 
 (* (factorial_system 0) から、(toplevel "factorial") に向けて (nat_msg 1) というメッセージが送られる遷移とそこまでの遷移列が存在する *)
 (* toplevel 使って名前を指定するところが微妙 *)
+(* forall parent,
+ *   deliver_exists (factorial_system 0 parent) parent (nat_msg 1).
+ * としたいが、external actor へのメッセージ送信には対応できていない
+ *)
 Theorem deliver_1 :
-  deliver_exists (factorial_system 0) (toplevel "factorial") (nat_msg 1).
+  deliver_exists (factorial_system 0 (toplevel "factorial")) (toplevel "factorial") (nat_msg 1).
 Proof.
   pose (top := toplevel "factorial").
   pose (factorial := (generated top 0)).
@@ -59,11 +62,11 @@ Proof.
   simpl; split.
   - unfold factorial_system.
     pose (fact_actor := actor_state factorial (become factorial_behv) [] 0).
-    pose (msg0 := fun me => tuple_msg (nat_msg 0) (name_msg me)).
+    pose (top_actor := actor_state top (become empty_behv) [] 1).
+    pose (msg0 := tuple_msg (nat_msg 0) (name_msg top)).
     pose (conf1 := conf []
                         [ fact_actor;
-                          actor_state top (me <- self;
-                                           factorial ! (msg0 me);
+                          actor_state top (factorial ! msg0;
                                            become empty_behv) [] 1
                         ]).
     eapply trans_trans.
@@ -72,8 +75,7 @@ Proof.
       exists New.
       assert (init "factorial" (
                      (x) <- new factorial_behv;
-                     (me) <- self ;
-                     (x) ! msg0 me; become empty_behv
+                     (x) ! msg0 ; become empty_behv
                    ) ~(New)~> conf1).
       {
         unfold init.
@@ -81,62 +83,46 @@ Proof.
       }
       apply H.
     }
-    pose (conf2 := conf []
-                        [ fact_actor;
-                          actor_state top (factorial ! msg0 top;
-                                           become empty_behv) [] 1
-                        ]).
-    eapply trans_trans.
-    {
-      exists Self.
-      assert (conf1 ~(Self)~> conf2).
-      {
-        apply trans_self with (actors_l := [fact_actor]).
-      }
-      apply H.
-    }
-    pose (conf3 := conf [send_message factorial (msg0 top)]
-                        [ fact_actor;
-                          actor_state top (become empty_behv) [] 1]).
+    pose (conf2 := conf [send_message factorial msg0]
+                        [ fact_actor; top_actor ]).
     eapply trans_trans.
     {
       exists Send.
-      assert (conf2 ~(Send)~> conf3).
+      assert (conf1 ~(Send)~> conf2).
       {
         apply trans_send with (actors_l := [fact_actor]).
       }
       apply H.
     }
-    pose (top_actor := actor_state top (become empty_behv) [] 1).
-    pose (conf4 := conf []
-                        [ actor_state factorial (become factorial_behv) [msg0 top] 0;
+    pose (conf3 := conf []
+                        [ actor_state factorial (become factorial_behv) [msg0] 0;
                           top_actor]).
     eapply trans_trans.
     {
       exists Deliver.
-      assert (conf3 ~(Deliver)~> conf4).
+      assert (conf2 ~(Deliver)~> conf3).
       {
         apply trans_deliver with (actors_l := []).
       }
       apply H.
     }
-    pose (conf5 := conf []
+    pose (conf4 := conf []
                         [ actor_state factorial (top ! nat_msg 1; become factorial_behv) [] 0;
                           top_actor]).
     eapply trans_trans.
     {
       exists Open.
-      assert (conf4 ~(Open)~> conf5).
+      assert (conf3 ~(Open)~> conf4).
       {
         apply trans_open with (actors_l := []).
       }
       apply H.
     }
-    pose (conf6 := conf [send_message top (nat_msg 1)] [fact_actor; top_actor]).
+    pose (conf5 := conf [send_message top (nat_msg 1)] [fact_actor; top_actor]).
     eapply trans_trans.
     {
       exists Send.
-      assert (conf5 ~(Send)~> conf6).
+      assert (conf4 ~(Send)~> conf5).
       {
         apply trans_send with (actors_l := []).
       }
