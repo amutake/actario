@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import List String.
+Require Import Coq.Lists.List String.
 Import ListNotations.
 
 Require Import util syntax semantics name_dec chain gen_fresh.

@@ -3,7 +3,7 @@ Declare ML Module "actor_extraction_plugin".
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import String List.
+Require Import String Coq.Lists.List.
 Import ListNotations.
 
 Definition machine_addr := string.

@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import List.
+Require Import Coq.Lists.List.
 Import ListNotations.
 
 Require Import util syntax semantics name_dec.
