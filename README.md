@@ -13,7 +13,7 @@ Actario = Actor + Scenario
 Requirements
 ------------
 
-- Coq 8.4pl5
+- Coq 8.4pl6
 
 
 Install
