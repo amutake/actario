@@ -30,3 +30,5 @@ html
 actor
 coq-8.4pl5
 patches
+.DS_Store
+memo.md
