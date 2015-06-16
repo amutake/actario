@@ -72,7 +72,6 @@ Record sending := mkSending {
 Inductive actor := mkActor {
                        actor_name : name;
                        remaining_actions : actions;
-                       local_queue : list message;
                        next_num : gen_number
                      }.
 (* behavior は持ってない。actions の最後に次の behavior が来るのと、アクションをし終わった (つまり become がでてきた) 状態のアクターしかメッセージを受け取れないので。でもこれはアクターとしてどうなの？外からは見えないものだけど。。 *)
@@ -91,13 +90,13 @@ CoFixpoint empty_behv : behavior := receive (fun _ => become empty_behv).
 (* toplevel アクター一つだけはちょっと強すぎるかもしれない？ *)
 Inductive initial_config : config -> Prop :=
 | init_conf : forall machine actions,
-                initial_config (mkConfig [] [mkActor (toplevel machine) actions [] 0]).
+                initial_config (mkConfig [] [mkActor (toplevel machine) actions 0]).
 
 Hint Constructors initial_config.
 
 (* initial config を作るやつ *)
 Definition init (sys_name : string) (initial_actions : actions) : config :=
-  mkConfig [] [ mkActor (toplevel sys_name) initial_actions [] 0 ].
+  mkConfig [] [ mkActor (toplevel sys_name) initial_actions 0 ].
 
 Lemma init_is_initial_config :
   forall sys_name actions,
