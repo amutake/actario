@@ -47,7 +47,7 @@ Inductive message : Set :=
  *)
 CoInductive actions : Type :=
 | new : behavior -> (name -> actions) -> actions (* CPS *)
-| send : name -> message -> actions -> actions   (* send n m a == n ! m;; a *)
+| send : name -> message -> actions -> actions   (* send n m a == n ! m; a *)
 | self : (name -> actions) -> actions            (* CPS *)
 | become : behavior -> actions                   (* become した後はアクションを取れない。become 以外は後に actions が続かなければならないので、次のメッセージを受け取れる状態になれば必ず become になる *)
 with behavior : Type :=
@@ -62,15 +62,27 @@ Notation "me '<-' 'self' ';' cont" := (self (fun me => cont)) (at level 0, cont 
  * become = "ある振る舞いでもって、次のメッセージの待ち状態になる" という意味だからいいのか
  *)
 
-Inductive sending : Type := send_message : name -> message -> sending.
+Record sending := mkSending {
+                      sending_to : name;
+                      sending_from : name;
+                      sending_content : message
+                    }.
 
 (* actor_state (このアクターの名前) (まだ実行していないアクション) (メッセージキュー) (生成番号) *)
-Inductive actor : Type :=
-| actor_state : name -> actions -> list message -> gen_number -> actor. (* behavior は持ってない。actions の最後に次の behavior が来るのと、アクションをし終わった (つまり become がでてきた) 状態のアクターしかメッセージを受け取れないので。でもこれはアクターとしてどうなの？外からは見えないものだけど。。 *)
-(* あと、グローバルメッセージキューの他に actor もメッセージキューを持つようにしたい。グローバルキューだけだと、先頭のメッセージの宛先のアクターがいつまでたっても仕事が終わらないとき、他のアクターはメッセージを受け取れない *)
+Inductive actor := mkActor {
+                       actor_name : name;
+                       remaining_actions : actions;
+                       local_queue : list message;
+                       next_num : gen_number
+                     }.
+(* behavior は持ってない。actions の最後に次の behavior が来るのと、アクションをし終わった (つまり become がでてきた) 状態のアクターしかメッセージを受け取れないので。でもこれはアクターとしてどうなの？外からは見えないものだけど。。 *)
+(* あと、グローバルメッセージキューの他に actor もメッセージキューを持つようにしたい。グローバルキューだけだと、先頭のメッセージの宛先のアクターがいつまでたっても仕事が終わらないとき、他のアクターはメッセージを受け取れない -> configuration の中のメッセージの順番をなくせばOK *)
 
-Inductive config : Type :=
-| conf : list sending -> list actor -> config. (* config が list sending を持つメリットはある？External Actor への送信とか？ *)
+Inductive config := mkConfig {
+                        sending_messages : list sending;
+                        actors : list actor
+                      }.
+(* config が list sending を持つメリットはある？External Actor への送信とか？ -> アクターとしては一般的な定義 *)
 
 (* メッセージを受け取っても何もしない振る舞い *)
 CoFixpoint empty_behv : behavior := receive (fun _ => become empty_behv).
@@ -79,13 +91,13 @@ CoFixpoint empty_behv : behavior := receive (fun _ => become empty_behv).
 (* toplevel アクター一つだけはちょっと強すぎるかもしれない？ *)
 Inductive initial_config : config -> Prop :=
 | init_conf : forall machine actions,
-                initial_config (conf [] [actor_state (toplevel machine) actions [] 0]).
+                initial_config (mkConfig [] [mkActor (toplevel machine) actions [] 0]).
 
 Hint Constructors initial_config.
 
 (* initial config を作るやつ *)
 Definition init (sys_name : string) (initial_actions : actions) : config :=
-  conf [] [ actor_state (toplevel sys_name) initial_actions [] 0 ].
+  mkConfig [] [ mkActor (toplevel sys_name) initial_actions [] 0 ].
 
 Lemma init_is_initial_config :
   forall sys_name actions,
@@ -95,69 +107,3 @@ Proof.
   unfold init.
   auto.
 Qed.
-
-Module Getter.
-
-  (* Parent name *)
-  Definition p (a : actor) : option name :=
-    match a with
-      | actor_state (generated parent _) _ _ _ => Some parent
-      | _ => None
-    end.
-
-  (* State generation number *)
-  Definition s (a : actor) : gen_number :=
-    match a with
-      | actor_state _ _ _ num => num
-    end.
-
-  (* Name *)
-  Definition n (a : actor) : name :=
-    match a with
-      | actor_state nm _ _ _ => nm
-    end.
-
-  (* Generated number *)
-  Definition g (a : actor) : option gen_number :=
-    match a with
-      | actor_state (generated _ gen) _ _ _ => Some gen
-      | _ => None
-    end.
-
-  (* Parent name and Generated number *)
-  Definition pg (a : actor) : option (name * gen_number) :=
-    match a with
-      | actor_state (generated p' g') _ _ _ => Some (p', g')
-      | _ => None
-    end.
-
-  (* Name and State generation number *)
-  Definition ns (a : actor) : (name * gen_number) :=
-    match a with
-      | actor_state n' _ _ s' => (n', s')
-    end.
-
-  (* Parent name with Prop *)
-  Definition pprop (a : actor) (P : name -> Prop) : Prop :=
-    match a with
-      | actor_state (generated pr _) _ _ _ => P pr
-      | _ => True
-    end.
-
-  (* Parent name with Prop from Name *)
-  Definition pprop_n (n : name) (P : name -> Prop) : Prop :=
-    match n with
-      | toplevel _ => True
-      | generated pr _ => P pr
-    end.
-
-  (* Parent name and Generated number with Prop *)
-  Definition pgprop (a : actor) (P : name -> gen_number -> Prop) : Prop :=
-    match a with
-      | actor_state (generated pr nm) _ _ _ => P pr nm
-      | _ => True
-    end.
-
-End Getter.
-
-Module G := Getter.
