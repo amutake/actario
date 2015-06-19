@@ -3,15 +3,55 @@ Declare ML Module "actor_extraction_plugin".
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import String Coq.Lists.List.
-Import ListNotations.
+Require Import Coq.Strings.String.
+Require Import Ssreflect.ssreflect Ssreflect.eqtype Ssreflect.seq Ssreflect.ssrbool Ssreflect.ssrnat.
+Require Import ssrstring.
 
-Definition machine_addr := string.
-Definition gen_number := nat.
+Section EqName.
+  Definition machine_addr := string.
+  Definition gen_number := nat.
 
-Inductive name : Set :=
-| toplevel : machine_addr -> name
-| generated : name -> gen_number -> name. (* ユーザーに generated というコンストラクタを使わせたくないのだけどできる？ *)
+  Inductive name : Set :=
+  | toplevel : machine_addr -> name
+  | generated : gen_number -> name -> name. (* ユーザーに generated というコンストラクタを使わせたくないのだけどできる？ *)
+
+  Fixpoint eqname (n1 n2 : name) : bool :=
+    match n1, n2 with
+      | toplevel m1, toplevel m2 => m1 == m2
+      | generated g1 n1, generated g2 n2 => (g1 == g2) && eqname n1 n2
+      | _, _ => false
+    end.
+
+  Lemma eqnameP : Equality.axiom eqname.
+  Proof.
+    elim=> [m1|g1 n1 IHn] [m2|g2 n2].
+    - apply: iffP => /=.
+      + exact: (m1 = m2).
+      + exact: eqstringP.
+      + by move=> ->.
+      + by move=> [].
+    - by right.
+    - by right.
+    - simpl.
+      apply: iffP.
+      + exact: ((g1 == g2) /\ (eqname n1 n2)).
+      + exact: andP.
+      + case => eqg eqn.
+        congr (generated _ _).
+        * by move/eqP: eqg.
+        * move: IHn; move/(_ n2) => IHn.
+            by move/IHn: eqn =><-.
+      + move=> [] <- <-.
+        split.
+        * apply: eq_refl.
+        * move: IHn; move/(_ n1) => IHn.
+          apply rwP in IHn.
+            by apply/IHn.
+  Qed.
+
+  Canonical name_eqMixin := EqMixin eqnameP.
+  Canonical name_eqType := Eval hnf in EqType name name_eqMixin.
+End EqName.
 
 (* 任意の Set をメッセージとして送ることができるようにするなら、message と name と actor と behavior に型タグ付けないといけない (と思う)
  * Inductive message (A : Set) : Set := wrap : A -> message A. みたいに。じゃないとパターンマッチできない
