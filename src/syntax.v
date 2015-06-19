@@ -25,17 +25,12 @@ Section EqName.
   Lemma eqnameP : Equality.axiom eqname.
   Proof.
     elim=> [m1|g1 n1 IHn] [m2|g2 n2].
-    - apply: iffP => /=.
-      + exact: (m1 = m2).
-      + exact: eqstringP.
-      + by move=> ->.
-      + by move=> [].
+    - rewrite/=.
+      by apply: (iffP eqP) => [->|[]].
     - by right.
     - by right.
     - simpl.
-      apply: iffP.
-      + exact: ((g1 == g2) /\ (eqname n1 n2)).
-      + exact: andP.
+      apply: (iffP andP).
       + case => eqg eqn.
         congr (generated _ _).
         * by move/eqP: eqg.
