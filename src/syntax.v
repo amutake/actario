@@ -7,7 +7,7 @@ Require Import Coq.Strings.String.
 Require Import Ssreflect.ssreflect Ssreflect.eqtype Ssreflect.seq Ssreflect.ssrbool Ssreflect.ssrnat.
 Require Import ssrstring.
 
-Section EqName.
+Section Name.
   Definition machine_addr := string.
   Definition gen_number := nat.
 
@@ -44,9 +44,9 @@ Section EqName.
 
   Canonical name_eqMixin := EqMixin eqnameP.
   Canonical name_eqType := Eval hnf in EqType name name_eqMixin.
-End EqName.
+End Name.
 
-Section EqMessage.
+Section Message.
   (* 任意の Set をメッセージとして送ることができるようにするなら、message と name と actor と behavior に型タグ付けないといけない (と思う)
    * Inductive message (A : Set) : Set := wrap : A -> message A. みたいに。じゃないとパターンマッチできない
    *
@@ -102,39 +102,62 @@ Section EqMessage.
 
   Canonical message_eqMixin := EqMixin eqmessageP.
   Canonical message_eqType := Eval hnf in EqType message message_eqMixin.
-End EqMessage.
+End Message.
 
+Section Action.
+  (* behavior は become で自分を指定することがよくあり、Inductive だとそのような再帰が書けなくなるので、CoInductive にしている *)
+  (* CoInductive なので、無限ループが書けちゃう *)
+  (* Inductive actions, CoInductive behavior な気がするけど、相互(余)帰納型でそういうのって書ける(正しい)の？ *)
+  (* CoFixpoint actions_example : actions :=
+   *   let behv := beh (fun _ => actions_example) in
+   *   become behv
+   * とかするから、actions も CoInductive で良さそう
+   *)
+  CoInductive actions : Type :=
+  | new : behavior -> (name -> actions) -> actions (* CPS *)
+  | send : name -> message -> actions -> actions   (* send n m a == n ! m; a *)
+  | self : (name -> actions) -> actions            (* CPS *)
+  | become : behavior -> actions                   (* become した後はアクションを取れない。become 以外は後に actions が続かなければならないので、次のメッセージを受け取れる状態になれば必ず become になる *)
+  with behavior : Type :=
+  | receive : (message -> actions) -> behavior.
 
-(* behavior は become で自分を指定することがよくあり、Inductive だとそのような再帰が書けなくなるので、CoInductive にしている *)
-(* CoInductive なので、無限ループが書けちゃう *)
-(* Inductive actions, CoInductive behavior な気がするけど、相互(余)帰納型でそういうのって書ける(正しい)の？ *)
-(* CoFixpoint actions_example : actions :=
- *   let behv := beh (fun _ => actions_example) in
- *   become behv
- * とかするから、actions も CoInductive で良さそう
- *)
-CoInductive actions : Type :=
-| new : behavior -> (name -> actions) -> actions (* CPS *)
-| send : name -> message -> actions -> actions   (* send n m a == n ! m; a *)
-| self : (name -> actions) -> actions            (* CPS *)
-| become : behavior -> actions                   (* become した後はアクションを取れない。become 以外は後に actions が続かなければならないので、次のメッセージを受け取れる状態になれば必ず become になる *)
-with behavior : Type :=
-| receive : (message -> actions) -> behavior.
+  Notation "n '<-' 'new' behv ; cont" := (new behv (fun n => cont)) (at level 0, cont at level 10).
+  Notation "n '!' m ';' a" := (send n m a) (at level 0, a at level 10).
+  Notation "me '<-' 'self' ';' cont" := (self (fun me => cont)) (at level 0, cont at level 10).
+  (* Lemma "アクションに終わりがあるなら、アクションの最後は become しか来ない"
+   * CoInductive なので action := send name msg action みたいなのが書けるから自明ではないんだけど、これ証明できるの？
+   * become = "ある振る舞いでもって、次のメッセージの待ち状態になる" という意味だからいいのか
+   *)
+End Action.
 
-Notation "n '<-' 'new' behv ; cont" := (new behv (fun n => cont)) (at level 0, cont at level 10).
-Notation "n '!' m ';' a" := (send n m a) (at level 0, a at level 10).
-Notation "me '<-' 'self' ';' cont" := (self (fun me => cont)) (at level 0, cont at level 10).
+Section Sending.
+  Record sending := mkSending {
+                        sending_to : name;
+                        sending_from : name;
+                        sending_content : message
+                      }.
 
-(* Lemma "アクションに終わりがあるなら、アクションの最後は become しか来ない"
- * CoInductive なので action := send name msg action みたいなのが書けるから自明ではないんだけど、これ証明できるの？
- * become = "ある振る舞いでもって、次のメッセージの待ち状態になる" という意味だからいいのか
- *)
+  Definition eqsending (s1 s2 : sending) :=
+    match s1, s2 with
+      | mkSending to1 fr1 c1, mkSending to2 fr2 c2 =>
+        (to1 == to2) && (fr1 == fr2) && (c1 == c2)
+    end.
 
-Record sending := mkSending {
-                      sending_to : name;
-                      sending_from : name;
-                      sending_content : message
-                    }.
+  Lemma eqsendingP : Equality.axiom eqsending.
+  Proof.
+    case=> [to1 fr1 c1] [to2 fr2 c2].
+    simpl.
+    apply: (iffP andP).
+    - case=> /andP [].
+        by do 3!move/eqP=> <-.
+    - case=> <- <- <-.
+      split; [ pose H := (rwP andP); apply H; split |];
+        exact: eqxx.
+  Qed.
+
+  Canonical sending_eqMixin := EqMixin eqsendingP.
+  Canonical sending_eqType := Eval hnf in EqType sending sending_eqMixin.
+End Sending.
 
 (* actor_state (このアクターの名前) (まだ実行していないアクション) (メッセージキュー) (生成番号) *)
 Inductive actor := mkActor {
