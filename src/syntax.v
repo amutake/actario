@@ -36,12 +36,10 @@ Section EqName.
         * by move/eqP: eqg.
         * move: IHn; move/(_ n2) => IHn.
             by move/IHn: eqn =><-.
-      + move=> [] <- <-.
+      + case=> <- <-.
         split.
         * apply: eq_refl.
-        * move: IHn; move/(_ n1) => IHn.
-          apply rwP in IHn.
-            by apply/IHn.
+        * by apply (rwP (IHn n1)).
   Qed.
 
   Canonical name_eqMixin := EqMixin eqnameP.
