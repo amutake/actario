@@ -46,29 +46,64 @@ Section EqName.
   Canonical name_eqType := Eval hnf in EqType name name_eqMixin.
 End EqName.
 
-(* 任意の Set をメッセージとして送ることができるようにするなら、message と name と actor と behavior に型タグ付けないといけない (と思う)
- * Inductive message (A : Set) : Set := wrap : A -> message A. みたいに。じゃないとパターンマッチできない
- *
- * Inductive message : Type := wrap : forall A : Set, A -> message.
- * match msg with
- *   | wrap nat n => addr ! wrap (n + 1); become empty_behv
- *   | _ => become empty_behv
- * end
- *
- * とかできるかな？と思ったけどできなかった (n has type 'nat' but it is expected to have type 'Datatype.nat' とか言われる。同じなんだけど => nat という変数名にバインドされてるからか。でも型でパターンマッチすることはできない (要出典) から、やっぱできない)
- * あとタプルを作るやつが Set じゃなくて Type だったのでメッセージにできなかった
- *
- * ターゲットを Erlang にするなら、Erlang のプリミティブをサポートするだけでいいかもしれない。
- * atom は string をラップするだけでいい。Extraction のときに string を atom に変換する。
- * Inductive atom : Set := mk_atom : string -> atom.
- *)
-Inductive message : Set :=
-| empty_msg : message
-| name_msg : name -> message
-| str_msg : string -> message
-| nat_msg : nat -> message
-| bool_msg : bool -> message
-| tuple_msg : message -> message -> message.
+Section EqMessage.
+  (* 任意の Set をメッセージとして送ることができるようにするなら、message と name と actor と behavior に型タグ付けないといけない (と思う)
+   * Inductive message (A : Set) : Set := wrap : A -> message A. みたいに。じゃないとパターンマッチできない
+   *
+   * Inductive message : Type := wrap : forall A : Set, A -> message.
+   * match msg with
+   *   | wrap nat n => addr ! wrap (n + 1); become empty_behv
+   *   | _ => become empty_behv
+   * end
+   *
+   * とかできるかな？と思ったけどできなかった (n has type 'nat' but it is expected to have type 'Datatype.nat' とか言われる。同じなんだけど => nat という変数名にバインドされてるからか。でも型でパターンマッチすることはできない (要出典) から、やっぱできない)
+   * あとタプルを作るやつが Set じゃなくて Type だったのでメッセージにできなかった
+   *
+   * ターゲットを Erlang にするなら、Erlang のプリミティブをサポートするだけでいいかもしれない。
+   * atom は string をラップするだけでいい。Extraction のときに string を atom に変換する。
+   * Inductive atom : Set := mk_atom : string -> atom.
+   *)
+
+  Inductive message : Set :=
+  | empty_msg : message
+  | name_msg : name -> message
+  | str_msg : string -> message
+  | nat_msg : nat -> message
+  | bool_msg : bool -> message
+  | tuple_msg : message -> message -> message.
+
+  Fixpoint eqmessage (m1 m2 : message) : bool :=
+    match m1, m2 with
+      | empty_msg, empty_msg => true
+      | name_msg n1, name_msg n2 => n1 == n2
+      | str_msg s1, str_msg s2 => s1 == s2
+      | nat_msg n1, nat_msg n2 => n1 == n2
+      | bool_msg b1, bool_msg b2 => b1 == b2
+      | tuple_msg t11 t12, tuple_msg t21 t22 =>
+        eqmessage t11 t21 && eqmessage t12 t22
+      | _, _ => false
+    end.
+
+  Lemma eqmessageP : Equality.axiom eqmessage.
+  Proof.
+    elim=> [|n1|s1|n1|b1|t11 IHt1 t12 IHt2] [|n2|s2|n2|b2|t21 t22];
+      do [ by apply: (iffP eqP) => [<-|[]] | by constructor | ].
+    rewrite/=.
+    apply: (iffP andP).
+    - case=> eqt1 eqt2.
+      congr (tuple_msg _ _).
+      + by move/IHt1: eqt1.
+      + by move/IHt2: eqt2.
+    - case=> <- <-.
+      split.
+      + by apply (rwP (IHt1 t11)).
+      + by apply (rwP (IHt2 t12)).
+  Qed.
+
+  Canonical message_eqMixin := EqMixin eqmessageP.
+  Canonical message_eqType := Eval hnf in EqType message message_eqMixin.
+End EqMessage.
+
 
 (* behavior は become で自分を指定することがよくあり、Inductive だとそのような再帰が書けなくなるので、CoInductive にしている *)
 (* CoInductive なので、無限ループが書けちゃう *)
