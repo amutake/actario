@@ -1,93 +1,75 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import String Coq.Lists.List.
-Import ListNotations.
-
+Require Import Ssreflect.eqtype Ssreflect.ssrbool Ssreflect.seq.
 Require Import syntax.
 
-Definition interp (m : message) (b : behavior) : actions :=
-  match b with
-    | receive f => f m
-  end.
+Inductive label :=
+| Receive (to : name) (from : name) (content : message) (* `to` receives a message `content` from `from` *)
+| Send (from : name) (to : name) (content : message)    (* `from` sends a message `content` to `to` *)
+| New (parent : name) (child : name)                    (* `parent` creates an actor named `child` *)
+| Self (me : name).                                     (* `me` gets own name *)
 
-Inductive trans_type := Deliver | Open | Send | New | Self.
 
-(* relation config *)
-(* trans type conf conf': type という遷移の種類で conf が遷移して conf' になる *)
-Inductive trans : trans_type -> config -> config -> Prop :=
+Reserved Notation "c1 '~(' t ')~>' c2" (at level 70).
 
-(* グローバルキューから、アクターのメッセージキューにメッセージを届ける *)
-(* External Actor へのメッセージだったら? (現状では configuration に宛先がいない場合はそこで遷移できなくなる) *)
-(* external_deliver というコンストラクタを追加するとか？=> そうなると configuration 同士をまとめるような configuration になるのでどう定義すればいいのかわからないし、変更するならかなり大規模な変更になりそう *)
-| trans_deliver : forall global_queue addr msg actions queue number actors_l actors_r,
-                    trans Deliver
-                          (conf (send_message addr msg :: global_queue)
-                                (actors_l
-                                   ++ actor_state addr actions queue number
-                                   :: actors_r))
-                          (conf global_queue
-                                (actors_l
-                                   ++ actor_state addr actions (queue ++ [msg]) number
-                                   :: actors_r))
-
-(* メッセージキューの先頭からメッセージを開封 *)
-(* deliver と合わせると、メッセージは必ず送信順に受け取られてしまうけど、いい？ *)
-(* 無限ループ以外は become 以外最後にならないので、become が来てたらもう他にアクションを起こさないから次のメッセージを受け取れる *)
-| trans_open : forall global_queue addr behv msg queue number actors_l actors_r,
-                 trans Open
-                       (conf global_queue
-                             (actors_l
-                                ++ actor_state addr (become behv) (msg :: queue) number
-                                :: actors_r))
-                       (conf global_queue
-                             (actors_l
-                                ++ actor_state addr (interp msg behv) queue number
-                                :: actors_r))
-(* send アクションが出てきたら、グローバルキューの最後にそのメッセージを追加 *)
-| trans_send : forall global_queue target msg addr cont queue number actors_l actors_r,
-                 trans Send
-                       (conf global_queue
-                             (actors_l
-                                ++ actor_state addr (send target msg cont) queue number
-                                :: actors_r))
-                       (conf (global_queue ++ [send_message target msg])
-                             (actors_l
-                                ++ actor_state addr cont queue number
-                                :: actors_r))
-
-| trans_new : forall global_queue addr behv cont queue number actors_l actors_r,
-                trans New
-                      (conf global_queue
-                            (actors_l
-                               ++ actor_state addr (new behv cont) queue number
-                               :: actors_r))
-                      (conf global_queue
-                            (actor_state (generated addr number) (become behv) [] 0 (* 最初は become behv で待ち状態 *)
-                               :: actors_l
-                               ++ actor_state addr (cont (generated addr number)) queue (S number)
-                               :: actors_r))
-
-| trans_self : forall global_queue addr cont queue number actors_l actors_r,
-                 trans Self
-                       (conf global_queue
-                             (actors_l
-                                ++ actor_state addr (self cont) queue number
-                                :: actors_r))
-                       (conf global_queue
-                             (actors_l
-                                ++ actor_state addr (cont addr) queue number
-                                :: actors_r)).
+(* transition defined as a relation of two config with label *)
+(* trans label conf conf': label という遷移のラベルで conf が遷移して conf' になる *)
+Inductive trans : label -> config -> config -> Prop :=
+(* basic receive transition *)
+| trans_receive :
+    forall to from content f gen,
+      (mkConfig [:: mkSending to from content]
+                [:: mkActor to (become (receive f)) gen])
+        ~(Receive to from content)~>
+        (mkConfig [::]
+                  [:: mkActor to (f content) gen])
+(* basic send transition *)
+| trans_send :
+    forall from to content actions gen,
+      (mkConfig [::]
+                [:: mkActor from (send to content actions) gen])
+        ~(Send from to content)~>
+        (mkConfig [:: mkSending to from content]
+                  [:: mkActor from actions gen])
+(* basic new transition *)
+| trans_new :
+    forall parent behv cont gen,
+      (mkConfig [::]
+                [:: mkActor parent (new behv cont) gen])
+        ~(New parent (generated gen parent))~>
+        (mkConfig [::]
+                  [:: (mkActor (generated gen parent) (become behv) 0);
+                    (mkActor parent (cont (generated gen parent)) (S gen))])
+(* basic self transition *)
+| trans_self :
+    forall me cont gen,
+      (mkConfig [::]
+                [:: mkActor me (self cont) gen])
+        ~(Self me)~>
+        (mkConfig [::]
+                  [:: mkActor me (cont me) gen])
+| trans_more_messages :
+    forall messages actors messages' actors' label messages_l messages_r,
+      mkConfig messages actors ~(label)~> mkConfig messages' actors' ->
+      mkConfig (messages_l ++ messages ++ messages_r) actors
+          ~(label)~>
+        mkConfig (messages_l ++ messages' ++ messages_r) actors'
+| trans_more_actors :
+    forall messages actors messages' actors' label actors_l actors_r,
+      mkConfig messages actors ~(label)~> mkConfig messages' actors' ->
+      mkConfig messages (actors_l ++ actors ++ actors_r)
+          ~(label)~>
+        mkConfig messages' (actors_l ++ actors' ++ actors_r)
+where "c1 '~(' t ')~>' c2" := (trans t c1 c2).
 
 Hint Constructors trans.
-
-Notation "c1 '~(' t ')~>' c2" := (trans t c1 c2) (at level 70).
 
 Reserved Notation "c1 '~>*' c2" (at level 70).
 
 Inductive trans_star : config -> config -> Prop :=
 | trans_refl : forall c, c ~>* c
-| trans_trans : forall c1 c2 c3, (exists t, c1 ~( t )~> c2) -> c2 ~>* c3 -> c1 ~>* c3
+| trans_trans : forall c1 c2 c3, (exists label, c1 ~(label)~> c2) -> c2 ~>* c3 -> c1 ~>* c3
 where "c1 '~>*' c2" := (trans_star c1 c2).
 
 Hint Constructors trans_star.
