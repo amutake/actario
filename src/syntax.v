@@ -108,6 +108,7 @@ Section Action.
   (* behavior は become で自分を指定することがよくあり、Inductive だとそのような再帰が書けなくなるので、CoInductive にしている *)
   (* CoInductive なので、無限ループが書けちゃう *)
   (* Inductive actions, CoInductive behavior な気がするけど、相互(余)帰納型でそういうのって書ける(正しい)の？ *)
+  (* CoInductive なので eqType にできない (CoFixpoint f : actions -> actions -> bool となるような関数を書けない) *)
   (* CoFixpoint actions_example : actions :=
    *   let behv := beh (fun _ => actions_example) in
    *   become behv
@@ -159,19 +160,19 @@ Section Sending.
   Canonical sending_eqType := Eval hnf in EqType sending sending_eqMixin.
 End Sending.
 
-(* actor_state (このアクターの名前) (まだ実行していないアクション) (メッセージキュー) (生成番号) *)
-Inductive actor := mkActor {
-                       actor_name : name;
-                       remaining_actions : actions;
-                       next_num : gen_number
-                     }.
+(* mkActor (このアクターの名前) (まだ実行していないアクション) (生成番号) *)
+Record actor := mkActor {
+                    actor_name : name;
+                    remaining_actions : actions;
+                    next_num : gen_number
+                  }.
 (* behavior は持ってない。actions の最後に次の behavior が来るのと、アクションをし終わった (つまり become がでてきた) 状態のアクターしかメッセージを受け取れないので。でもこれはアクターとしてどうなの？外からは見えないものだけど。。 *)
 (* あと、グローバルメッセージキューの他に actor もメッセージキューを持つようにしたい。グローバルキューだけだと、先頭のメッセージの宛先のアクターがいつまでたっても仕事が終わらないとき、他のアクターはメッセージを受け取れない -> configuration の中のメッセージの順番をなくせばOK *)
 
-Inductive config := mkConfig {
-                        sending_messages : list sending;
-                        actors : list actor
-                      }.
+Record config := mkConfig {
+                     sending_messages : seq sending;
+                     actors : seq actor
+                   }.
 (* config が list sending を持つメリットはある？External Actor への送信とか？ -> アクターとしては一般的な定義 *)
 
 (* メッセージを受け取っても何もしない振る舞い *)
@@ -181,19 +182,18 @@ CoFixpoint empty_behv : behavior := receive (fun _ => become empty_behv).
 (* toplevel アクター一つだけはちょっと強すぎるかもしれない？ *)
 Inductive initial_config : config -> Prop :=
 | init_conf : forall machine actions,
-                initial_config (mkConfig [] [mkActor (toplevel machine) actions 0]).
+                initial_config (mkConfig [::] [:: mkActor (toplevel machine) actions 0]).
 
 Hint Constructors initial_config.
 
 (* initial config を作るやつ *)
 Definition init (sys_name : string) (initial_actions : actions) : config :=
-  mkConfig [] [ mkActor (toplevel sys_name) initial_actions 0 ].
+  mkConfig [::] [:: mkActor (toplevel sys_name) initial_actions 0 ].
 
 Lemma init_is_initial_config :
   forall sys_name actions,
     initial_config (init sys_name actions).
 Proof.
-  intros sys_name actions.
-  unfold init.
-  auto.
+  move=> sys_name actions.
+  constructor.
 Qed.
