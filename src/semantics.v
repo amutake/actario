@@ -4,12 +4,53 @@ Unset Strict Implicit.
 Require Import Ssreflect.eqtype Ssreflect.ssrbool Ssreflect.seq.
 Require Import syntax.
 
-Inductive label :=
-| Receive (to : name) (from : name) (content : message) (* `to` receives a message `content` from `from` *)
-| Send (from : name) (to : name) (content : message)    (* `from` sends a message `content` to `to` *)
-| New (parent : name) (child : name)                    (* `parent` creates an actor named `child` *)
-| Self (me : name).                                     (* `me` gets own name *)
+Section Label.
+  Inductive label :=
+  | Receive (to : name) (from : name) (content : message) (* `to` receives a message `content` from `from` *)
+  | Send (from : name) (to : name) (content : message)    (* `from` sends a message `content` to `to` *)
+  | New (parent : name) (child : name)                    (* `parent` creates an actor named `child` *)
+  | Self (me : name).                                     (* `me` gets own name *)
 
+  Definition eqlabel (l1 l2 : label) : bool :=
+    match l1, l2 with
+      | Receive t1 f1 c1, Receive t2 f2 c2 =>
+        (t1 == t2) && (f1 == f2) && (c1 == c2)
+      | Send f1 t1 c1, Send f2 t2 c2 =>
+        (f1 == f2) && (t1 == t2) && (c1 == c2)
+      | New p1 c1, New p2 c2 =>
+        (p1 == p2) && (c1 == c2)
+      | Self m1, Self m2 => m1 == m2
+      | _, _ => false
+    end.
+
+  Lemma eqlabelP : Equality.axiom eqlabel.
+  Proof.
+    case=> [t1 f1 c1|f1 t1 c1|p1 c1|m1] [t2 f2 c2|f2 t2 c2|p2 c2|m2];
+      try by constructor.
+    - apply: (iffP andP).
+      + by case=> /andP []; do 3 move/eqP=> <-.
+      + case=> <- <- <-.
+        split; last exact: eqxx.
+        pose H := (rwP andP); apply H.
+        split; exact: eqxx.
+    - apply: (iffP andP).
+      + by case=> /andP []; do 3 move/eqP=> <-.
+      + case=> <- <- <-.
+        split; last exact: eqxx.
+        pose H := (rwP andP); apply H.
+        split; exact: eqxx.
+    - apply: (iffP andP).
+      + by case; do 2 move/eqP=> <-.
+      + case=> <- <-.
+        split; exact: eqxx.
+    - apply: (iffP eqP).
+      + by move=><-.
+      + by case=><-.
+  Qed.
+
+  Canonical label_eqMixin := EqMixin eqlabelP.
+  Canonical label_eqType := Eval hnf in EqType label label_eqMixin.
+End Label.
 
 Reserved Notation "c1 '~(' t ')~>' c2" (at level 70).
 
