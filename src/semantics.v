@@ -52,56 +52,38 @@ Section Label.
   Canonical label_eqType := Eval hnf in EqType label label_eqMixin.
 End Label.
 
-Reserved Notation "c1 '~(' t ')~>' c2" (at level 70).
+Reserved Notation "c1 '~(' t ')~>' c2" (at level 90).
 
 (* transition defined as a relation of two config with label *)
 (* trans label conf conf': label という遷移のラベルで conf が遷移して conf' になる *)
 Inductive trans : label -> config -> config -> Prop :=
-(* basic receive transition *)
+(* receive transition *)
 | trans_receive :
-    forall to from content f gen,
-      (mkConfig [:: mkSending to from content]
-                [:: mkActor to (become (receive f)) gen])
+    forall sendings to from content f gen actors,
+      [:: Build_sending to from content] \cup sendings >< [:: Build_actor to (become (receive f)) gen] \cup actors
         ~(Receive to from content)~>
-        (mkConfig [::]
-                  [:: mkActor to (f content) gen])
-(* basic send transition *)
+        sendings >< [:: Build_actor to (f content) gen] \cup actors
+(* send transition *)
 | trans_send :
-    forall from to content actions gen,
-      (mkConfig [::]
-                [:: mkActor from (send to content actions) gen])
+    forall sendings from to content cont gen actors,
+      sendings >< [:: Build_actor from (send to content cont) gen] \cup actors
         ~(Send from to content)~>
-        (mkConfig [:: mkSending to from content]
-                  [:: mkActor from actions gen])
-(* basic new transition *)
+        [:: Build_sending to from content] \cup sendings >< [:: Build_actor from cont gen] \cup actors
+(* new transition *)
 | trans_new :
-    forall parent behv cont gen,
-      (mkConfig [::]
-                [:: mkActor parent (new behv cont) gen])
+    forall sendings parent behv cont gen actors,
+      sendings >< [:: Build_actor parent (new behv cont) gen] \cup actors
         ~(New parent (generated gen parent))~>
-        (mkConfig [::]
-                  [:: (mkActor (generated gen parent) (become behv) 0);
-                    (mkActor parent (cont (generated gen parent)) (S gen))])
-(* basic self transition *)
+        sendings ><
+                  [:: Build_actor (generated gen parent) (become behv) 0
+                   ; Build_actor parent (cont (generated gen parent)) (S gen)
+                  ] \cup actors
+(* self transition *)
 | trans_self :
-    forall me cont gen,
-      (mkConfig [::]
-                [:: mkActor me (self cont) gen])
+    forall sendings me cont gen actors,
+      sendings >< [:: Build_actor me (self cont) gen] \cup actors
         ~(Self me)~>
-        (mkConfig [::]
-                  [:: mkActor me (cont me) gen])
-| trans_more_messages :
-    forall messages actors messages' actors' label messages_l messages_r,
-      mkConfig messages actors ~(label)~> mkConfig messages' actors' ->
-      mkConfig (messages_l ++ messages ++ messages_r) actors
-          ~(label)~>
-        mkConfig (messages_l ++ messages' ++ messages_r) actors'
-| trans_more_actors :
-    forall messages actors messages' actors' label actors_l actors_r,
-      mkConfig messages actors ~(label)~> mkConfig messages' actors' ->
-      mkConfig messages (actors_l ++ actors ++ actors_r)
-          ~(label)~>
-        mkConfig messages' (actors_l ++ actors' ++ actors_r)
+        sendings >< [:: Build_actor me (cont me) gen] \cup actors
 where "c1 '~(' t ')~>' c2" := (trans t c1 c2).
 
 Hint Constructors trans.
