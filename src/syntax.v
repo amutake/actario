@@ -175,7 +175,7 @@ Record config := {
                 }.
 (* config が list sending を持つメリットはある？External Actor への送信とか？ -> アクターとしては一般的な定義 *)
 
-Notation "s >< a" := (Build_config s a) (at level 80, no associativity).
+Notation "s >< a" := (Build_config s a) (at level 50, no associativity).
 
 (* メッセージを受け取っても何もしない振る舞い *)
 CoFixpoint empty_behv : behavior := receive (fun _ => become empty_behv).
@@ -200,4 +200,4 @@ Proof.
   constructor.
 Qed.
 
-Notation "s1 \cup s2" := (s1 ++ s2) (at level 70, right associativity).
+Notation "s1 \cup s2" := (s1 ++ s2) (at level 60, right associativity).

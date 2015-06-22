@@ -27,3 +27,4 @@ src/gen_fresh.v
 src/no_dup.v
 src/trans_invariant.v
 src/properties.v
+src/fairness.v
