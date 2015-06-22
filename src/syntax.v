@@ -132,15 +132,15 @@ Section Action.
 End Action.
 
 Section Sending.
-  Record sending := mkSending {
-                        sending_to : name;
-                        sending_from : name;
-                        sending_content : message
-                      }.
+  Record sending := {
+                     sending_to : name;
+                     sending_from : name;
+                     sending_content : message
+                   }.
 
   Definition eqsending (s1 s2 : sending) :=
     match s1, s2 with
-      | mkSending to1 fr1 c1, mkSending to2 fr2 c2 =>
+      | Build_sending to1 fr1 c1, Build_sending to2 fr2 c2 =>
         (to1 == to2) && (fr1 == fr2) && (c1 == c2)
     end.
 
@@ -160,20 +160,22 @@ Section Sending.
   Canonical sending_eqType := Eval hnf in EqType sending sending_eqMixin.
 End Sending.
 
-(* mkActor (このアクターの名前) (まだ実行していないアクション) (生成番号) *)
-Record actor := mkActor {
-                    actor_name : name;
-                    remaining_actions : actions;
-                    next_num : gen_number
-                  }.
+(* Build_actor (このアクターの名前) (まだ実行していないアクション) (生成番号) *)
+Record actor := {
+                 actor_name : name;
+                 remaining_actions : actions;
+                 next_num : gen_number
+               }.
 (* behavior は持ってない。actions の最後に次の behavior が来るのと、アクションをし終わった (つまり become がでてきた) 状態のアクターしかメッセージを受け取れないので。でもこれはアクターとしてどうなの？外からは見えないものだけど。。 *)
 (* あと、グローバルメッセージキューの他に actor もメッセージキューを持つようにしたい。グローバルキューだけだと、先頭のメッセージの宛先のアクターがいつまでたっても仕事が終わらないとき、他のアクターはメッセージを受け取れない -> configuration の中のメッセージの順番をなくせばOK *)
 
-Record config := mkConfig {
-                     sending_messages : seq sending;
-                     actors : seq actor
-                   }.
+Record config := {
+                  sending_messages : seq sending;
+                  actors : seq actor
+                }.
 (* config が list sending を持つメリットはある？External Actor への送信とか？ -> アクターとしては一般的な定義 *)
+
+Notation "s >< a" := (Build_config s a) (at level 80, no associativity).
 
 (* メッセージを受け取っても何もしない振る舞い *)
 CoFixpoint empty_behv : behavior := receive (fun _ => become empty_behv).
@@ -182,13 +184,13 @@ CoFixpoint empty_behv : behavior := receive (fun _ => become empty_behv).
 (* toplevel アクター一つだけはちょっと強すぎるかもしれない？ *)
 Inductive initial_config : config -> Prop :=
 | init_conf : forall machine actions,
-                initial_config (mkConfig [::] [:: mkActor (toplevel machine) actions 0]).
+                initial_config ([::] >< [:: Build_actor (toplevel machine) actions 0]).
 
 Hint Constructors initial_config.
 
 (* initial config を作るやつ *)
 Definition init (sys_name : string) (initial_actions : actions) : config :=
-  mkConfig [::] [:: mkActor (toplevel sys_name) initial_actions 0 ].
+  [::] >< [:: Build_actor (toplevel sys_name) initial_actions 0 ].
 
 Lemma init_is_initial_config :
   forall sys_name actions,
@@ -197,3 +199,5 @@ Proof.
   move=> sys_name actions.
   constructor.
 Qed.
+
+Notation "s1 \cup s2" := (s1 ++ s2) (at level 70, right associativity).
