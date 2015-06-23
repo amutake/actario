@@ -52,40 +52,20 @@ Section Label.
   Canonical label_eqType := Eval hnf in EqType label label_eqMixin.
 End Label.
 
-(* count =  *)
-(* fun (T : Type) (a : pred T) => *)
-(* fix count (s : seq T) : nat := *)
-(*   match s with *)
-(*   | [::] => 0 *)
-(*   | x :: s' => ssrnat.addn (ssrnat.nat_of_bool (a x)) (count s') *)
-(*   end *)
-(*      : forall T : Type, pred T -> seq T -> nat *)
+Section PermEqActor.
+  (* Actor version of perm_eq *)
+  (* This is because actor cannot be an instance of eqType (actions cannot be an instance of eqType because actions is defined as co-inductive type) *)
 
-(* pred1 =  *)
-(* fun (T : eqType) (a1 : T) => SimplPred (T:=T) (xpred1 a1) *)
-(*      : forall T : eqType, T -> simpl_pred T *)
+  Notation xpred1_actor := (fun a x => actor_name a == actor_name x).
 
-(* Notation xpred1 := (fun a1 x => eq_op x a1) *)
+  Definition pred1_actor (a : actor) :=
+    SimplPred (xpred1_actor a).
 
-(* SimplPred =  *)
-(* fun (T : Type) (p : pred T) => ssrfun.SimplFun p *)
-(*      : forall T : Type, pred T -> simpl_pred T *)
+  Notation count_mem_actor a := (count (pred1_actor a)).
 
-(* Notation count_mem x := (count (pred1 x)) *)
-
-(* Actor version of perm_eq *)
-(* This is because actor cannot be an instance of eqType (actions cannot be an instance of eqType because actions is defined as co-inductive type) *)
-
-Notation xpred1_actor := (fun a x => actor_name a == actor_name x).
-
-Definition pred1_actor (a : actor) :=
-  SimplPred (xpred1_actor a).
-
-Notation count_mem_actor a := (count (pred1_actor a)).
-
-Fixpoint perm_eq_actors (s1 s2 : seq actor) : bool :=
-  all (SimplPred (T := actor) (fun a : actor => (count_mem_actor a) s1 == (count_mem_actor a) s2)) (s1 \cup s2).
-
+  Fixpoint perm_eq_actors (s1 s2 : seq actor) : bool :=
+    all (SimplPred (T := actor) (fun a : actor => (count_mem_actor a) s1 == (count_mem_actor a) s2)) (s1 \cup s2).
+End PermEqActor.
 
 (* labeled transition semantics *)
 (* between two configurations with a label *)
