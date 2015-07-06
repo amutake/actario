@@ -52,59 +52,35 @@ Section Label.
   Canonical label_eqType := Eval hnf in EqType label label_eqMixin.
 End Label.
 
-Section PermEqActor.
-  (* Actor version of perm_eq *)
-  (* This is because actor cannot be an instance of eqType (actions cannot be an instance of eqType because actions is defined as co-inductive type) *)
-
-  Notation xpred1_actor := (fun a x => actor_name a == actor_name x).
-
-  Definition pred1_actor (a : actor) :=
-    SimplPred (xpred1_actor a).
-
-  Notation count_mem_actor a := (count (pred1_actor a)).
-
-  Fixpoint perm_eq_actors (s1 s2 : seq actor) : bool :=
-    all (SimplPred (T := actor) (fun a : actor => (count_mem_actor a) s1 == (count_mem_actor a) s2)) (s1 \cup s2).
-End PermEqActor.
-
 (* labeled transition semantics *)
 (* between two configurations with a label *)
 Reserved Notation "c1 '~(' t ')~>' c2" (at level 60).
 Inductive trans : label -> config -> config -> Prop :=
 (* receive transition *)
 | trans_receive :
-    forall sendings to from content f gen actors s s' a a',
-      perm_eq s ([:: Build_sending to from content] \cup sendings) ->
-      perm_eq s' sendings ->
-      perm_eq_actors a ([:: Build_actor to (become (receive f)) gen] \cup actors) ->
-      perm_eq_actors a' ([:: Build_actor to (f content) gen] \cup actors) ->
-      (s >< a) ~(Receive to from content)~> (s' >< a')
+    forall sendings_l sendings_r to from content f gen actors_l actors_r,
+      (sendings_l ++ Build_sending to from content :: sendings_r) >< (actors_l ++ Build_actor to (become (receive f)) gen :: actors_r)
+        ~(Receive to from content)~>
+        (sendings_l ++ sendings_r) >< (actors_l ++ Build_actor to (f content) gen :: actors_r)
 (* send transition *)
 | trans_send :
-    forall sendings from to content cont gen actors s s' a a',
-      perm_eq s sendings ->
-      perm_eq s' ([:: Build_sending to from content] \cup sendings) ->
-      perm_eq_actors a ([:: Build_actor from (send to content cont) gen] \cup actors) ->
-      perm_eq_actors a' ([:: Build_actor from cont gen] \cup actors) ->
-      s >< a ~(Send from to content)~> s' >< a'
+    forall sendings_l sendings_r from to content cont gen actors_l actors_r,
+      (sendings_l ++ sendings_r) >< (actors_l ++ Build_actor from (send to content cont) gen :: actors_r)
+         ~(Send from to content)~>
+         (sendings_l ++ Build_sending to from content :: sendings_r) >< (actors_r ++ Build_actor from cont gen :: actors_r)
 (* new transition *)
 | trans_new :
-    forall sendings parent behv cont gen actors s s' a a',
-      perm_eq s sendings ->
-      perm_eq s' sendings ->
-      perm_eq_actors a ([:: Build_actor parent (new behv cont) gen] \cup actors) ->
-      perm_eq_actors a' ([:: Build_actor (generated gen parent) (become behv) 0
-                          ; Build_actor parent (cont (generated gen parent)) (S gen)
-                         ] \cup actors) ->
-      s >< a ~(New parent (generated gen parent))~> s' >< a'
+    forall sendings parent behv cont gen actors_l actors_r,
+      sendings >< (actors_l ++ Build_actor parent (new behv cont) gen :: actors_r)
+        ~(New parent (generated gen parent))~>
+        sendings >< (Build_actor (generated gen parent) (become behv) 0 :: actors_l ++
+                     Build_actor parent (cont (generated gen parent)) (S gen) :: actors_r)
 (* self transition *)
 | trans_self :
-    forall sendings me cont gen actors s s' a a',
-      perm_eq s sendings ->
-      perm_eq s' sendings ->
-      perm_eq_actors a ([:: Build_actor me (self cont) gen] \cup actors) ->
-      perm_eq_actors a' ([:: Build_actor me (cont me) gen] \cup actors) ->
-      s >< a ~(Self me)~> s' >< a'
+    forall sendings me cont gen actors_l actors_r,
+      sendings >< (actors_l ++ Build_actor me (self cont) gen :: actors_r)
+        ~(Self me)~>
+        sendings >< (actors_l ++ Build_actor me (cont me) gen :: actors_r)
 where "c1 '~(' t ')~>' c2" := (trans t c1 c2).
 
 Hint Constructors trans.
