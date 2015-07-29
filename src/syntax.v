@@ -7,10 +7,10 @@ Require Import Coq.Strings.String.
 Require Import Ssreflect.ssreflect Ssreflect.eqtype Ssreflect.seq Ssreflect.ssrbool Ssreflect.ssrnat.
 Require Import ssrstring.
 
-Section Name.
-  Definition machine_addr := string.
-  Definition gen_number := nat.
+Notation machine_addr := string.
+Notation gen_number := nat.
 
+Section Name.
   Inductive name : Set :=
   | toplevel : machine_addr -> name
   | generated : gen_number -> name -> name. (* ユーザーに generated というコンストラクタを使わせたくないのだけどできる？ *)
@@ -199,5 +199,3 @@ Proof.
   move=> sys_name actions.
   constructor.
 Qed.
-
-Notation "s1 \cup s2" := (s1 ++ s2) (at level 60, right associativity).

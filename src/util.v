@@ -3,6 +3,125 @@ Unset Strict Implicit.
 
 Require Import Coq.Lists.List.
 Import ListNotations.
+Require Import Ssreflect.ssreflect Ssreflect.ssrbool Ssreflect.eqtype Ssreflect.seq.
+
+Section Seq.
+
+  Variable A : Type.
+
+  Lemma app3_nil : forall s1 s2 s3 : seq A,
+                     s1 ++ s2 ++ s3 = [::] ->
+                     s1 = [::] /\ s2 = [::] /\ s3 = [::].
+  Proof.
+    move=> s1 s2 s3 H.
+    do 2 (apply app_eq_nil in H; case: H => [? H]).
+    by repeat split.
+  Qed.
+
+  Lemma app3_single : forall s1 s2 s3 (a : A),
+                        s1 ++ s2 ++ s3 = [:: a] ->
+                        (s1 = [:: a] /\ s2 = [::] /\ s3 = [::]) \/
+                        (s1 = [::] /\ s2 = [:: a] /\ s3 = [::]) \/
+                        (s1 = [::] /\ s2 = [::] /\ s3 = [:: a]).
+  Proof.
+    move=> s1 s2 s3 a.
+    case: s1.
+    - case s2.
+      + move=> H.
+        by (right; right).
+      + move=> a' s2' H.
+        simpl in H.
+        inversion H; subst.
+        apply app_eq_nil in H2.
+        case: H2 => -> ->.
+          by (right; left).
+    - move=> a' s1' H.
+      simpl in H.
+      inversion H; subst.
+      apply app3_nil in H2.
+      case: H2 =>->.
+      case=>->->.
+      simpl.
+        by left.
+  Qed.
+
+  Lemma app_single : forall s1 s2 (a : A),
+                       s1 ++ s2 = [:: a] ->
+                       (s1 = [:: a] /\ s2 = [::]) \/
+                       (s1 = [::] /\ s2 = [:: a]).
+  Proof.
+    move=> s1 s2 a.
+    case: s1.
+    - move=> /= ->.
+      by right.
+    - move=> a' s1 H.
+      case: H => -> H.
+      apply app_eq_nil in H.
+      case: H => -> ->; by left.
+  Qed.
+
+  Lemma app3_duo : forall s1 s2 s3 (a1 a2 : A),
+                     s1 ++ s2 ++ s3 = [:: a1; a2] ->
+                     (s1 = [:: a1; a2] /\ s2 = [::] /\ s3 = [::]) \/
+                     (s1 = [:: a1] /\ s2 = [:: a2] /\ s3 = [::]) \/
+                     (s1 = [:: a1] /\ s2 = [::] /\ s3 = [:: a2]) \/
+                     (s1 = [::] /\ s2 = [:: a1; a2] /\ s3 = [::]) \/
+                     (s1 = [::] /\ s2 = [:: a1] /\ s3 = [:: a2]) \/
+                     (s1 = [::] /\ s2 = [::] /\ s3 = [:: a1; a2]).
+  Proof.
+    move=> s1 s2 s3 a1 a2.
+    case: s1.
+    - case s2.
+      + move=> H.
+        by repeat right.
+      + move=> a' s2' /= H.
+        case: H => -> H.
+        apply app_single in H.
+        case: H; case=> -> ->.
+        * by do 3 right; left.
+        * by do 4 right; left.
+    - move=> a1' s1 /=.
+      case=> -> H.
+      apply app3_single in H.
+      case: H; case; case=> ->; case=> -> ->.
+      + by left.
+      + by right; left.
+      + by do 2 right; left.
+  Qed.
+
+  Lemma app3_sub_single : forall (s1 s2 s2' s3 : seq A) a a',
+                            a <> a' ->
+                            s1 ++ s2 ++ s3 = [:: a] ->
+                            s1 ++ s2' ++ s3 = [:: a'] ->
+                            s1 = [::] /\ s2 = [:: a] /\ s2' = [:: a'] /\ s3 = [::].
+  Proof.
+    move=> s1 s2 s2' s3 a a' neqa H H'.
+    apply app3_single in H.
+    apply app3_single in H'.
+    case: H; case; case=> eqs1; case=> -> eqs3;
+      case: H'; case; case=> eqs1'; case=> -> eqs3';
+      move: eqs1 eqs3 eqs1' eqs3'; move=>->->;
+      move=> H1 H2; try done.
+    - inversion H1; done.
+    - inversion H2; done.
+  Qed.
+
+  Lemma app3_sub_duo : forall (s1 s2 s2' s3 : seq A) a1 a1' a2 a2',
+                         a1 <> a1' ->
+                         a2 <> a2' ->
+                         s1 ++ s2 ++ s3 = [:: a1; a2] ->
+                         s1 ++ s2' ++ s3 = [:: a1'; a2'] ->
+                         s1 = [::] /\ s2 = [:: a1; a2] /\ s2' = [:: a1'; a2'] /\ s3 = [::].
+  Proof.
+    move=> s1 s2 s2' s3 a1 a1' a2 a2' neqa1 neqa2 H H'.
+    apply app3_duo in H.
+    apply app3_duo in H'.
+    case: H; repeat case; move=> eqs1; case=> -> eqs3;
+      case: H'; repeat case; move=> eqs1'; case=> -> eqs3';
+      move: eqs1 eqs3 eqs1' eqs3'; move=>->->;
+      move=> H1 H2; do [ done | by case: H1 | by case: H2 ].
+  Qed.
+End Seq.
 
 Section Forall.
 

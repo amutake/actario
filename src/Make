@@ -6,4 +6,5 @@ chain.v
 gen_fresh.v
 no_dup.v
 trans_invariant.v
-properties.v
+# properties.v
+# fairness.v
