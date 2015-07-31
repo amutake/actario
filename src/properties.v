@@ -1,36 +1,18 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import Coq.Lists.List.
-Import ListNotations.
+Require Import Ssreflect.seq.
 
 Require Import syntax semantics.
 
-Definition deliver_exists (ini : config) (target : name) (msg : message) :=
-  exists global_queue actions queue number actors_l actors_r,
-    let c := (conf (send_message target msg :: global_queue)
-              (actors_l
-                 ++ actor_state target actions queue number
-                 :: actors_r)) in
-    ini ~>* c /\ (exists c', c ~(Deliver)~> c').
+Definition receive_exists (ini : config) (to : name) (content : message) :=
+  exists c from,
+    ini ~>* c /\ (exists c', c ~(Receive to from content)~> c').
 
-Definition open_exists (ini : config) (target : name) (msg : message) :=
-  exists global_queue behv queue number actors_l actors_r,
-    forall c,
-    c = (conf global_queue
-              (actors_l
-                 ++ actor_state target (become behv) (msg :: queue) number
-                 :: actors_r)) ->
-    ini ~>* c /\ (exists c', c ~(Open)~> c').
-
-Definition open_exists_with_behv (ini : config) (target : name) (msg : message) (behv : behavior) :=
-  exists global_queue queue number actors_l actors_r,
-    forall c,
-    c = (conf global_queue
-              (actors_l
-                 ++ actor_state target (become behv) (msg :: queue) number
-                 :: actors_r)) ->
-    ini ~>* c /\ (exists c', c ~(Open)~> c').
+Definition receive_exists_with_behv (ini : config) (to : name) (content : message) (behv : behavior) :=
+  exists from sendings actors_l actors_r next,
+    let c := sendings >< (actors_l ++ Build_actor to (become behv) next :: actors_r) in
+    ini ~>* c /\ (exists c', c ~(Receive to from content)~> c').
 
 (* (msg : message) じゃなくて (P : msg -> Prop) とかのほうが良さそう *)
 
