@@ -1,3 +1,5 @@
+ssrascii.v
+ssrstring.v
 util.v
 syntax.v
 name_dec.v
