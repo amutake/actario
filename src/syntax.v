@@ -122,14 +122,15 @@ Section Action.
   with behavior : Type :=
   | receive : (message -> actions) -> behavior.
 
-  Notation "n '<-' 'new' behv ; cont" := (new behv (fun n => cont)) (at level 0, cont at level 10).
-  Notation "n '!' m ';' a" := (send n m a) (at level 0, a at level 10).
-  Notation "me '<-' 'self' ';' cont" := (self (fun me => cont)) (at level 0, cont at level 10).
   (* Lemma "アクションに終わりがあるなら、アクションの最後は become しか来ない"
    * CoInductive なので action := send name msg action みたいなのが書けるから自明ではないんだけど、これ証明できるの？
    * become = "ある振る舞いでもって、次のメッセージの待ち状態になる" という意味だからいいのか
    *)
 End Action.
+
+Notation "n '<-' 'new' behv ; cont" := (new behv (fun n => cont)) (at level 0, cont at level 10).
+Notation "n '!' m ';' a" := (send n m a) (at level 0, a at level 10).
+Notation "me '<-' 'self' ';' cont" := (self (fun me => cont)) (at level 0, cont at level 10).
 
 Section Sending.
   Record sending := {

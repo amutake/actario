@@ -18,6 +18,8 @@ plugin/actor_extract_env.mli
 plugin/g_actor_extraction.ml4
 plugin/actor_extraction_plugin.mllib
 
+src/ssrascii.v
+src/ssrstring.v
 src/util.v
 src/syntax.v
 src/name_dec.v

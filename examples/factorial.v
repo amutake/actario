@@ -1,8 +1,8 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import List NPeano Actario.syntax Actario.semantics Actario.properties.
-Import ListNotations.
+Require Import Ssreflect.seq Ssreflect.ssrnat.
+Require Import Actario.syntax Actario.semantics Actario.properties.
 
 (**
  * ref: An Algebraic Theory of Actors and its Actors and Application to a Simple Object-Based Language (Gul Agha, 2004)
@@ -51,12 +51,12 @@ Open Scope string_scope.
  * としたいが、external actor へのメッセージ送信には対応できていない
  *)
 Theorem deliver_1 :
-  deliver_exists (factorial_system 0 (toplevel "factorial")) (toplevel "factorial") (nat_msg 1).
+  receive_exists (factorial_system 0 (toplevel "factorial")) (toplevel "factorial") (nat_msg 1).
 Proof.
   pose (top := toplevel "factorial").
-  pose (factorial := (generated top 0)).
+  pose (factorial := (generated 0 top)).
 
-  unfold deliver_exists.
+  unfold receive_exists.
   exists [], (become empty_behv), [], 1.
   exists [actor_state factorial (become factorial_behv) [] 0], []. (* gen_number, actors_l, actors_r とか何でも良くない？ *)
   simpl; split.
