@@ -1,25 +1,48 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import Coq.Lists.List String.
-Import ListNotations.
+Require Import Ssreflect.ssreflect Ssreflect.ssrfun Ssreflect.eqtype Ssreflect.seq Ssreflect.ssrbool Ssreflect.ssrnat.
 
 Require Import util syntax semantics name_dec chain gen_fresh.
 
 (* list actor 内のアクターについて、アクターの名前が被ってない *)
-Definition no_dup (actors : list actor) : Prop := NoDup (map G.n actors).
+Definition no_dup (actors : seq actor) := uniq (map actor_name actors).
 
-Hint Constructors NoDup.
-
-Lemma no_dup_related_only_name :
+Lemma no_dup_decided_by_only_name :
   forall actors actors',
-    map G.n actors = map G.n actors' ->
+    map actor_name actors = map actor_name actors' ->
     no_dup actors ->
     no_dup actors'.
 Proof.
-  unfold no_dup.
-  intros actors actors' name_eq no.
-  rewrite <- name_eq; auto.
+  rewrite/no_dup.
+  move=> actors actors' name_eq no.
+    by rewrite <- name_eq.
+Qed.
+
+Lemma name_next_in_name :
+  forall p x actors,
+    p == x.1 ->
+    x \in map name_next actors ->
+    p \in map actor_name actors.
+Proof.
+  move=> p x actors.
+  elim: actors.
+  - move=> H; move=> //=.
+  - move=> a l IH H.
+    simpl in *.
+    do!rewrite in_cons.
+    set H as i; move: i.
+    move/IH=> H1.
+    unfold name_next in *.
+    + case/orP.
+      * move/eqP=> H'.
+        apply/orP.
+        subst; by left.
+      * move=> H'.
+        apply/orP.
+        subst.
+        right.
+          by apply/H1.
 Qed.
 
 (* 仮定が gen_fresh だけだと成り立たない。
@@ -31,105 +54,88 @@ Qed.
  * => no_dup も必要。同じ名前のがあると、現在の生成番号が小さい方をどんどん生成していったらいつかぶつかる。
  *)
 Lemma new_trans_gen_fresh :
-  forall msgs msgs' actors actors',
+  forall sendings sendings' actors actors' child,
     chain actors ->
     gen_fresh actors ->
     no_dup actors ->
-    trans New (conf msgs actors) (conf msgs' actors') ->
+    (sendings >< actors) ~(New child)~> (sendings' >< actors') ->
     gen_fresh actors'.
 Proof.
-  intros msgs msgs' actors actors' ch fr no tr.
+  move=> sendings sendings' actors actors' child.
+  move=> ch fr no tr.
+  inversion tr; subst.
+  constructor.
   (* assert (ch' : chain actors'); *)
   (* apply new_trans_chain with (msgs := msgs) (msgs' := msgs') (actors' := actors') in ch; auto. *)
-  inversion tr; subst.
-  clear tr.
-  constructor.
   (* 1. gen_fresh の補題「gen_number が増えても、gen_fresh は成り立つ」(gen_fresh_increase) を使う *)
   (* 2. chain の補題「子がいないなら孫もいない」(no_child_no_grandchild) もしくは「いないやつの子はいない」(no_actor_no_child) を使う??? *)
   (* 3. no_dup の条件を使う *)
-  - apply gen_fresh_increase in fr.
-    eapply gen_fresh_related_only_name_number with (actors := actors_l ++ actor_state addr (new behv cont) queue (S number) :: actors_r); auto.
-    repeat (rewrite map_app); auto.
-  - intros yet le.
-    rewrite map_app.
-    simpl.
-
-    apply chain_insert_iff in ch.
-    apply gen_fresh_insert_iff in fr.
+  - move/gen_fresh_increase: fr.
+    apply/gen_fresh_decided_by_only_name_and_next_number.
+    by rewrite/name_next; repeat (rewrite map_cat) => /=.
+  - move=> yet le.
+    rewrite map_cat mem_cat =>/=; rewrite in_cons.
+    move/gen_fresh_insert_iff: fr=>fr.
+    move/chain_insert_iff: ch=> ch.
     inversion fr; subst.
-
-    assert (number <= number); auto.
-    apply H5 in H.
-    eapply head_leaf_child_not_in in ch.
-    + simpl in ch.
-      rewrite map_app in ch.
-      apply NotIn_app_iff in ch.
-      destruct ch as [ ch_l ch_r ].
-      apply NotIn_app_iff.
-      split.
-      * apply ch_l.
-      * apply NotIn_cons_iff.
-        split; [ intro c; symmetry in c; apply name_not_cycle2 in c; auto | ].
-        apply ch_r.
-    + simpl; auto.
-  - apply Forall_app_iff.
-    unfold no_dup in no.
-    rewrite map_app in no.
-    simpl in no.
-    apply NoDup_insert_iff in no.
-    inversion no; subst.
-    split.
-    + apply Forall_forall.
-      intros x inx.
-      destruct x.
-      intro peq.
-      subst.
-      apply NotIn_app_iff in H1.
-      destruct H1 as [ H1l H1r ].
-      assert (forall a actors, In a actors -> In (G.n a) (map G.n actors)).
-      * induction actors; auto.
-        simpl.
-        intro H.
-        destruct H; [ left; subst; auto | right; apply IHactors; auto ].
-      * apply H in inx.
-        simpl in inx.
-        exfalso; auto.
-    + apply Forall_cons_iff.
-      split; auto.
-      apply Forall_forall.
-      intros x inx.
-      destruct x.
-      intro peq.
-      subst.
-      apply NotIn_app_iff in H1.
-      destruct H1 as [ H1l H1r ].
-      assert (forall a actors, In a actors -> In (G.n a) (map G.n actors)).
-      * induction actors; auto.
-        simpl.
-        intro H.
-        destruct H; [ left; subst; auto | right; apply IHactors; auto ].
-      * apply H in inx.
-        simpl in inx.
-        exfalso; auto.
+    move/(_ gen): H4=> H4.
+    have: gen <= gen by exact: leqnn.
+    move/H4.
+    move/head_leaf_child_not_in: ch=> /=.
+    move/(_ gen yet)=> imp.
+    move/imp.
+    rewrite map_cat mem_cat.
+    case/norP=> in_l in_r.
+    apply/or3P; case.
+    + by apply/negP.
+    + move/eqP=> contra; symmetry in contra; by apply: (name_not_cycle2 contra).
+    + by apply/negP.
+  - rewrite map_cat all_cat =>/=.
+    have: all (fun nn => parent != nn.1) (map name_next actors_l) &&
+              all (fun nn => parent != nn.1) (map name_next actors_r).
+    {
+      move: no.
+      rewrite/no_dup.
+      rewrite map_cat; simpl.
+      rewrite cat_uniq cons_uniq.
+      case/and4P=> uniq_l has_p notin_p uniq_r.
+      apply/andP; split.
+      * apply/allP=> x all_p.
+        apply/negP=> contra.
+        move/negP: has_p; apply.
+        apply/hasP.
+        exists parent.
+        - rewrite in_cons; apply/orP; left; exact: eq_refl.
+        - apply: name_next_in_name; done.
+      * apply/allP=> x in_p.
+        apply/negP=> contra.
+        move/negP: notin_p; apply.
+        apply: name_next_in_name; done.
+    }
+    case/andP=> allnot_l allnot_r.
+    apply/and3P; do!split.
+    + apply/allP=> x in_p; apply/implyP=> peq.
+      by move/allP/(_ x in_p)/negP: allnot_l.
+    + apply/implyP=> _.
+      exact: ltnSn.
+    + apply/allP=> x in_p; apply/implyP=> peq.
+      by move/allP/(_ x in_p)/negP: allnot_r.
 Qed.
 
 Lemma new_trans_no_dup :
-  forall msgs msgs' actors actors',
+  forall msgs msgs' actors actors' child,
     gen_fresh actors ->
     no_dup actors ->
-    trans New (conf msgs actors) (conf msgs' actors') ->
+    (msgs >< actors) ~(New child)~> (msgs' >< actors') ->
     no_dup actors'.
 Proof.
-  intros msgs msgs' actors actors' fr no tr.
+  move=> msgs msgs' actors actors' child fr no tr.
   inversion tr; subst.
-  eapply new_trans_fresh with (actor0 := actor_state (generated addr number) (become behv) [] 0) in fr.
-  - unfold no_dup.
-    simpl.
-    constructor.
-    + apply fr.
-    + unfold no_dup in no.
-      rewrite map_app in *.
-      simpl in *.
-      auto.
-  - apply tr.
+  eapply new_trans_fresh with (actor0 := Build_actor (generated gen parent) (become behv) 0) in fr; last by exact: tr.
+  - rewrite/no_dup/=.
+    apply/andP; split.
+    + exact: fr.
+    + move: no; rewrite/no_dup.
+      do!rewrite map_cat =>/=.
+      done.
 Qed.

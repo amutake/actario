@@ -1,93 +1,99 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import String Coq.Lists.List.
-Import ListNotations.
-
+Require Import Ssreflect.eqtype Ssreflect.ssrbool Ssreflect.seq Ssreflect.ssrnat.
 Require Import syntax.
 
-Definition interp (m : message) (b : behavior) : actions :=
-  match b with
-    | receive f => f m
-  end.
+Section Label.
+  Inductive label :=
+  | Receive (to : name) (from : name) (content : message) (* `to` receives a message `content` from `from` *)
+  | Send (from : name) (to : name) (content : message)    (* `from` sends a message `content` to `to` *)
+  | New (child : name)                                    (* an actor named `child` is created *)
+  | Self (me : name).                                     (* `me` gets own name *)
 
-Inductive trans_type := Deliver | Open | Send | New | Self.
+  Definition eqlabel (l1 l2 : label) : bool :=
+    match l1, l2 with
+      | Receive t1 f1 c1, Receive t2 f2 c2 =>
+        (t1 == t2) && (f1 == f2) && (c1 == c2)
+      | Send f1 t1 c1, Send f2 t2 c2 =>
+        (f1 == f2) && (t1 == t2) && (c1 == c2)
+      | New c1, New c2 => c1 == c2
+      | Self m1, Self m2 => m1 == m2
+      | _, _ => false
+    end.
 
-(* relation config *)
-(* trans type conf conf': type という遷移の種類で conf が遷移して conf' になる *)
-Inductive trans : trans_type -> config -> config -> Prop :=
+  Lemma eqlabelP : Equality.axiom eqlabel.
+  Proof.
+    case=> [t1 f1 c1|f1 t1 c1|c1|m1] [t2 f2 c2|f2 t2 c2|c2|m2];
+      try by constructor.
+    - apply: (iffP andP).
+      + by case=> /andP []; do 3 move/eqP=> <-.
+      + case=> <- <- <-.
+        split; last exact: eqxx.
+        pose H := (rwP andP); apply H.
+        split; exact: eqxx.
+    - apply: (iffP andP).
+      + by case=> /andP []; do 3 move/eqP=> <-.
+      + case=> <- <- <-.
+        split; last exact: eqxx.
+        pose H := (rwP andP); apply H.
+        split; exact: eqxx.
+    - apply: (iffP eqP).
+      + by move=><-.
+      + by case=><-.
+    - apply: (iffP eqP).
+      + by move=><-.
+      + by case=><-.
+  Qed.
 
-(* グローバルキューから、アクターのメッセージキューにメッセージを届ける *)
-(* External Actor へのメッセージだったら? (現状では configuration に宛先がいない場合はそこで遷移できなくなる) *)
-(* external_deliver というコンストラクタを追加するとか？=> そうなると configuration 同士をまとめるような configuration になるのでどう定義すればいいのかわからないし、変更するならかなり大規模な変更になりそう *)
-| trans_deliver : forall global_queue addr msg actions queue number actors_l actors_r,
-                    trans Deliver
-                          (conf (send_message addr msg :: global_queue)
-                                (actors_l
-                                   ++ actor_state addr actions queue number
-                                   :: actors_r))
-                          (conf global_queue
-                                (actors_l
-                                   ++ actor_state addr actions (queue ++ [msg]) number
-                                   :: actors_r))
+  Canonical label_eqMixin := EqMixin eqlabelP.
+  Canonical label_eqType := Eval hnf in EqType label label_eqMixin.
+End Label.
 
-(* メッセージキューの先頭からメッセージを開封 *)
-(* deliver と合わせると、メッセージは必ず送信順に受け取られてしまうけど、いい？ *)
-(* 無限ループ以外は become 以外最後にならないので、become が来てたらもう他にアクションを起こさないから次のメッセージを受け取れる *)
-| trans_open : forall global_queue addr behv msg queue number actors_l actors_r,
-                 trans Open
-                       (conf global_queue
-                             (actors_l
-                                ++ actor_state addr (become behv) (msg :: queue) number
-                                :: actors_r))
-                       (conf global_queue
-                             (actors_l
-                                ++ actor_state addr (interp msg behv) queue number
-                                :: actors_r))
-(* send アクションが出てきたら、グローバルキューの最後にそのメッセージを追加 *)
-| trans_send : forall global_queue target msg addr cont queue number actors_l actors_r,
-                 trans Send
-                       (conf global_queue
-                             (actors_l
-                                ++ actor_state addr (send target msg cont) queue number
-                                :: actors_r))
-                       (conf (global_queue ++ [send_message target msg])
-                             (actors_l
-                                ++ actor_state addr cont queue number
-                                :: actors_r))
-
-| trans_new : forall global_queue addr behv cont queue number actors_l actors_r,
-                trans New
-                      (conf global_queue
-                            (actors_l
-                               ++ actor_state addr (new behv cont) queue number
-                               :: actors_r))
-                      (conf global_queue
-                            (actor_state (generated addr number) (become behv) [] 0 (* 最初は become behv で待ち状態 *)
-                               :: actors_l
-                               ++ actor_state addr (cont (generated addr number)) queue (S number)
-                               :: actors_r))
-
-| trans_self : forall global_queue addr cont queue number actors_l actors_r,
-                 trans Self
-                       (conf global_queue
-                             (actors_l
-                                ++ actor_state addr (self cont) queue number
-                                :: actors_r))
-                       (conf global_queue
-                             (actors_l
-                                ++ actor_state addr (cont addr) queue number
-                                :: actors_r)).
+(* labeled transition semantics *)
+(* between two configurations with a label *)
+Reserved Notation "c1 '~(' t ')~>' c2" (at level 60).
+Inductive trans : label -> config -> config -> Prop :=
+(* receive transition *)
+| trans_receive :
+    forall to from content f gen sendings_l sendings_r actors_l actors_r,
+      (sendings_l ++ Build_sending to from content :: sendings_r)
+                 >< (actors_l ++ Build_actor to (become (receive f)) gen :: actors_r)
+        ~(Receive to from content)~>
+        (sendings_l ++ sendings_r) >< (actors_l ++ Build_actor to (f content) gen :: actors_r)
+(* send transition *)
+| trans_send :
+    forall from to content cont gen sendings_l sendings_r actors_l actors_r,
+      (sendings_l ++ sendings_r)
+                 >< (actors_l ++ Build_actor from (send to content cont) gen :: actors_r)
+         ~(Send from to content)~>
+         (sendings_l ++ Build_sending to from content :: sendings_r)
+           >< (actors_l ++ Build_actor from cont gen :: actors_r)
+(* new transition *)
+| trans_new :
+    forall parent behv cont gen sendings actors_l actors_r,
+      sendings >< (actors_l ++ Build_actor parent (new behv cont) gen :: actors_r)
+        ~(New (generated gen parent))~>
+        sendings ><
+          (Build_actor (generated gen parent) (become behv) 0 ::
+          actors_l ++
+          Build_actor parent (cont (generated gen parent)) (S gen) ::
+          actors_r)
+(* self transition *)
+| trans_self :
+    forall me cont gen sendings actors_l actors_r,
+      sendings >< (actors_l ++ Build_actor me (self cont) gen :: actors_r)
+        ~(Self me)~>
+        sendings >< (actors_l ++ Build_actor me (cont me) gen :: actors_r)
+where "c1 '~(' t ')~>' c2" := (trans t c1 c2).
 
 Hint Constructors trans.
-
-Notation "c1 '~(' t ')~>' c2" := (trans t c1 c2) (at level 70).
 
 Reserved Notation "c1 '~>*' c2" (at level 70).
 
 Inductive trans_star : config -> config -> Prop :=
 | trans_refl : forall c, c ~>* c
-| trans_trans : forall c1 c2 c3, (exists t, c1 ~( t )~> c2) -> c2 ~>* c3 -> c1 ~>* c3
+| trans_trans : forall c1 c2 c3, (exists label, c1 ~(label)~> c2) -> c2 ~>* c3 -> c1 ~>* c3
 where "c1 '~>*' c2" := (trans_star c1 c2).
 
 Hint Constructors trans_star.

@@ -1,4 +1,4 @@
-box: amutake/coq@0.0.3
+box: amutake/ssreflect@0.0.3
 build:
   steps:
     - script:

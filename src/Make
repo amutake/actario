@@ -1,3 +1,5 @@
+ssrascii.v
+ssrstring.v
 util.v
 syntax.v
 name_dec.v
@@ -7,3 +9,4 @@ gen_fresh.v
 no_dup.v
 trans_invariant.v
 properties.v
+fairness.v
