@@ -14,7 +14,7 @@ Requirements
 ------------
 
 - Coq 8.4pl6
-
+- SSReflect 1.5
 
 Install
 -------
