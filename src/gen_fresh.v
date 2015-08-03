@@ -62,9 +62,8 @@ Proof.
         move=> H.
         move/H/implyP: prod_in.
         move=> H1.
-        have: prod.1 == prod.1. exact: eq_refl.
-        move/H1.
-        by rewrite ltnn.
+        rewrite eq_refl ltnn in H1.
+        by move/H1: is_true_true.
     + move=> contra.
       move: H => /=.
       rewrite in_cons.
@@ -73,7 +72,7 @@ Proof.
         rewrite/name_next => /= prod_eq.
         move: contra; rewrite prod_eq => /=.
         move/(_ gen_num): H3=> H3.
-        have: gen_num <= gen_num; first exact: leqnn.
+        have: gen_num <= gen_num by exact: leqnn.
         move/H3.
         move=> notin_p in_p.
         move/negP: notin_p=> notin_p.
@@ -245,8 +244,8 @@ Proof.
         rewrite Heqa2 =>/= imp all_p.
         apply/negP; case/eqP=> eq_g eq_n.
         subst.
-        have: p_a1 == p_a1; first exact: eq_refl.
-        move/imp; rewrite ltnNge; move/negP=> contra; by apply: contra.
+        rewrite eq_refl in imp; move/imp: is_true_true.
+        rewrite ltnNge; move/negP=> contra; by apply: contra.
     (* H1_2 を使う *)
     - apply/negP=> contra.
       move/H1_2: le.
