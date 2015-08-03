@@ -10,3 +10,4 @@ no_dup.v
 trans_invariant.v
 properties.v
 fairness.v
+persistence.v
