@@ -43,7 +43,7 @@ Current status
     + theories/syntax.v
 - [x] Proof of no duplication of Actor names
     + theories/trans_invariant.v (`initial_trans_star_no_dup`)
-- [ ] Mechanisms/Lemmas to verify Actor systems
+- [ ] Mechanisms/Lemmas for verifying Actor systems
 - [ ] Communication between configurations
 - [x] Extraction to Erlang
     + Equivalence between Actario's semantics and Erlang's semantics is not proven
@@ -55,3 +55,9 @@ License
 -------
 
 LGPL 2.1
+
+
+Papers
+------
+
+- [AGERE!@SPLASH2015](./papers/AGERE2015.pdf)
