@@ -57,10 +57,12 @@ Reserved Notation "c1 '~(' t ')~>' c2" (at level 60).
 Inductive trans : label -> config -> config -> Prop :=
 (* receive transition *)
 | trans_receive :
-    forall to from msg next_state f gen msgs
+    forall to from msg
+           st next_state f gen msgs
            rest actors actors',
       Permutation actors (
                     {|
+                      state_type := st;
                       actor_name := to;
                       remaining_actions := become next_state;
                       next_num := gen;
@@ -79,17 +81,19 @@ Inductive trans : label -> config -> config -> Prop :=
 (* send transition *)
 | trans_send :
     forall from to msg
-           from_cont from_gen from_msgs from_f
-           to_actions to_gen to_msgs to_f
+           from_st from_cont from_gen from_msgs from_f
+           to_st to_actions to_gen to_msgs to_f
            rest actors actors',
       Permutation actors (
                     {|
+                      state_type := from_st;
                       actor_name := from;
                       remaining_actions := send to msg from_cont;
                       next_num := from_gen;
                       behv := from_f;
                       queue := from_msgs
                     |} :: {|
+                      state_type := to_st;
                       actor_name := to;
                       remaining_actions := to_actions;
                       next_num := to_gen;
@@ -98,12 +102,14 @@ Inductive trans : label -> config -> config -> Prop :=
                        |} :: rest) ->
       Permutation actors' (
                     {|
+                      state_type := from_st;
                       actor_name := from;
                       remaining_actions := from_cont;
                       next_num := from_gen;
                       behv := from_f;
                       queue := from_msgs
                     |} :: {|
+                         state_type := to_st;
                          actor_name := to;
                          remaining_actions := to_actions;
                          next_num := to_gen;
@@ -113,27 +119,30 @@ Inductive trans : label -> config -> config -> Prop :=
       actors ~(Send from to msg)~> actors'
 (* new transition *)
 | trans_new :
-    forall parent parent_behv parent_cont gen parent_msgs
-           child_behv
+    forall parent_st parent parent_behv parent_cont gen parent_msgs
+           child_st child_behv child_ini
            rest actors actors',
       Permutation actors (
                     {|
+                      state_type := parent_st;
                       actor_name := parent;
-                      remaining_actions := new child_behv parent_cont;
+                      remaining_actions := new child_behv child_ini parent_cont;
                       next_num := gen;
                       behv := parent_behv;
                       queue := parent_msgs
                     |} :: rest) ->
       Permutation actors' (
                     {|
+                      state_type := parent_st;
                       actor_name := parent;
                       remaining_actions := parent_cont (generated gen parent);
                       next_num := gen;
                       behv := parent_behv;
                       queue := parent_msgs
                     |} :: {|
+                      state_type := child_st;
                       actor_name := generated gen parent;
-                      remaining_actions := become 0;
+                      remaining_actions := become child_ini;
                       next_num := 0;
                       behv := child_behv;
                       queue := [::]
@@ -141,10 +150,11 @@ Inductive trans : label -> config -> config -> Prop :=
       actors ~(New (generated gen parent))~> actors'
 (* self transition *)
 | trans_self :
-    forall me cont gen f msgs
+    forall st me cont gen f msgs
            rest actors actors',
       Permutation actors (
                     {|
+                      state_type := st;
                       actor_name := me;
                       remaining_actions := self cont;
                       next_num := gen;
@@ -153,6 +163,7 @@ Inductive trans : label -> config -> config -> Prop :=
                     |} :: rest) ->
       Permutation actors' (
                     {|
+                      state_type := st;
                       actor_name := me;
                       remaining_actions := cont me;
                       next_num := gen;

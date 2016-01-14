@@ -115,14 +115,13 @@ Section Action.
    * とかするから、actions も CoInductive で良さそう
    *)
   (* use nat as state *)
-  Notation state := nat.
-  Inductive actions : Set :=
-  | new : behavior -> (name -> actions) -> actions (* CPS, initial state is 0 *)
-  | send : name -> message -> actions -> actions   (* send n m a == n ! m; a *)
-  | self : (name -> actions) -> actions            (* CPS *)
-  | become : state -> actions                   (* become した後はアクションを取れない。become 以外は後に actions が続かなければならないので、次のメッセージを受け取れる状態になれば必ず become になる. initial state is 0 *)
-  with behavior : Set :=
-  | receive : (message -> state -> actions) -> behavior.
+  Inductive actions (state : Set) : Type :=
+  | new : forall child_state : Set, behavior child_state -> child_state -> (name -> actions state) -> actions state (* CPS, initial state is 0 *)
+  | send : name -> message -> actions state -> actions state   (* send n m a == n ! m; a *)
+  | self : (name -> actions state) -> actions state           (* CPS *)
+  | become : state -> actions state                   (* become した後はアクションを取れない。become 以外は後に actions が続かなければならないので、次のメッセージを受け取れる状態になれば必ず become になる *)
+  with behavior (state : Set) : Type :=
+  | receive : (message -> state -> actions state) -> behavior state.
 
   (* eqactions, eqbehavior は定義できない。(2つの関数を受け取って bool を返すような関数を作らなければいけないから (同じ形をしているかどうかさえ判定してくれればそれでいいけど…)) *)
 
@@ -133,16 +132,17 @@ Section Action.
    *)
 End Action.
 
-Notation "n '<-' 'new' behv ; cont" := (new behv (fun n => cont)) (at level 0, cont at level 10).
+Notation "n '<-' 'new' behv 'with' ini ; cont" := (new behv ini (fun n => cont)) (at level 0, cont at level 10).
 Notation "n '!' m ';' a" := (send n m a) (at level 0, a at level 10).
 Notation "me '<-' 'self' ';' cont" := (self (fun me => cont)) (at level 0, cont at level 10).
 
 (* Build_actor (このアクターの名前) (まだ実行していないアクション) (生成番号) *)
 Record actor := {
+                 state_type : Set;
                  actor_name : name;
-                 remaining_actions : actions;
+                 remaining_actions : actions state_type;
                  next_num : gen_number;
-                 behv : behavior;
+                 behv : behavior state_type;
                  queue : seq message
                }.
 (* behavior は持ってない。actions の最後に次の behavior が来るのと、アクションをし終わった (つまり become がでてきた) 状態のアクターしかメッセージを受け取れないので。でもこれはアクターとしてどうなの？外からは見えないものだけど。。 *)
@@ -151,19 +151,34 @@ Record actor := {
 Definition config := seq actor.
 
 (* メッセージを受け取っても何もしない振る舞い *)
-Definition empty_behv : behavior := receive (fun _ st => become st).
+Definition empty_behv (state : Set) : behavior state := receive (fun _ st => become st).
 
 (* 初期状態 *)
 (* toplevel アクター一つだけはちょっと強すぎるかもしれない？ *)
 Inductive initial_config : config -> Prop :=
-| init_conf : forall machine behv,
-                initial_config ([:: Build_actor (toplevel machine) (become 0) 0 behv [::]]).
+| init_conf : forall machine actions,
+    initial_config ([:: {|
+                         actor_name := toplevel machine;
+                         state_type := unit;
+                         remaining_actions := actions;
+                         next_num := 0;
+                         behv := receive (fun _ _ => actions);
+                         queue := [::]
+                       |}]).
 
 Hint Constructors initial_config.
 
 (* initial config を作るやつ *)
-Definition init (sys_name : string) (behv : behavior) : config :=
-  [:: Build_actor (toplevel sys_name) (become 0) 0 behv [::]].
+Definition init (sys_name : string) (actions : actions unit) : config :=
+  [::
+     {|
+       actor_name := toplevel sys_name;
+       state_type := unit;
+       remaining_actions := actions;
+       next_num := 0;
+       behv := receive (fun _ _ => actions);
+       queue := [::]
+     |}].
 
 Lemma init_is_initial_config :
   forall sys_name behv,
