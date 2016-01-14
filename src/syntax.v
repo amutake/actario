@@ -116,15 +116,15 @@ Section Action.
    *)
   (* use nat as state *)
   Notation state := nat.
-  Inductive actions : Type :=
+  Inductive actions : Set :=
   | new : behavior -> (name -> actions) -> actions (* CPS, initial state is 0 *)
   | send : name -> message -> actions -> actions   (* send n m a == n ! m; a *)
   | self : (name -> actions) -> actions            (* CPS *)
   | become : state -> actions                   (* become した後はアクションを取れない。become 以外は後に actions が続かなければならないので、次のメッセージを受け取れる状態になれば必ず become になる. initial state is 0 *)
-  with behavior : Type :=
+  with behavior : Set :=
   | receive : (message -> state -> actions) -> behavior.
 
-  (* eqactions, eqbehavior は定義できない。(関数の等価性について言わなければいけないから) *)
+  (* eqactions, eqbehavior は定義できない。(2つの関数を受け取って bool を返すような関数を作らなければいけないから (同じ形をしているかどうかさえ判定してくれればそれでいいけど…)) *)
 
   (* Lemma "アクションに終わりがあるなら、アクションの最後は become しか来ない"
    * CoInductive なので action := send name msg action みたいなのが書けるから自明ではないんだけど、これ証明できるの？
@@ -142,7 +142,6 @@ Record actor := {
                  actor_name : name;
                  remaining_actions : actions;
                  next_num : gen_number;
-                 state : nat;
                  behv : behavior;
                  queue : seq message
                }.
@@ -158,13 +157,13 @@ Definition empty_behv : behavior := receive (fun _ st => become st).
 (* toplevel アクター一つだけはちょっと強すぎるかもしれない？ *)
 Inductive initial_config : config -> Prop :=
 | init_conf : forall machine behv,
-                initial_config ([:: Build_actor (toplevel machine) (become 0) 0 0 behv [::]]).
+                initial_config ([:: Build_actor (toplevel machine) (become 0) 0 behv [::]]).
 
 Hint Constructors initial_config.
 
 (* initial config を作るやつ *)
 Definition init (sys_name : string) (behv : behavior) : config :=
-  [:: Build_actor (toplevel sys_name) (become 0) 0 0 behv [::]].
+  [:: Build_actor (toplevel sys_name) (become 0) 0 behv [::]].
 
 Lemma init_is_initial_config :
   forall sys_name behv,

@@ -1,13 +1,14 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
+Require Import Coq.Sorting.Permutation.
 Require Import Ssreflect.eqtype Ssreflect.ssrbool Ssreflect.seq Ssreflect.ssrnat.
 Require Import syntax.
 
 Section Label.
   Inductive label :=
-  | Receive (to : name) (from : name) (content : message) (* `to` receives a message `content` from `from` *)
-  | Send (from : name) (to : name) (content : message)    (* `from` sends a message `content` to `to` *)
+  | Receive (to : name) (from : name) (msg : message) (* `to` receives a message `content` from `from` *)
+  | Send (from : name) (to : name) (content : message)    (* `from` sends a message `msg` to `to` *)
   | New (child : name)                                    (* an actor named `child` is created *)
   | Self (me : name).                                     (* `me` gets own name *)
 
@@ -56,35 +57,109 @@ Reserved Notation "c1 '~(' t ')~>' c2" (at level 60).
 Inductive trans : label -> config -> config -> Prop :=
 (* receive transition *)
 | trans_receive :
-    forall to from content f gen sendings_l sendings_r actors_l actors_r,
-      (sendings_l ++ Build_sending to from content :: sendings_r)
-                 >< (actors_l ++ Build_actor to (become (receive f)) gen :: actors_r)
-        ~(Receive to from content)~>
-        (sendings_l ++ sendings_r) >< (actors_l ++ Build_actor to (f content) gen :: actors_r)
+    forall to from msg next_state f gen msgs
+           rest actors actors',
+      Permutation actors (
+                    {|
+                      actor_name := to;
+                      remaining_actions := become next_state;
+                      next_num := gen;
+                      behv := receive f;
+                      queue := (msg :: msgs)
+                    |} :: rest) ->
+      Permutation actors' (
+                    {|
+                      actor_name := to;
+                      remaining_actions := (f msg next_state);
+                      next_num := gen;
+                      behv := receive f;
+                      queue := msgs
+                    |} :: rest) ->
+      actors ~(Receive to from msg)~> actors'
 (* send transition *)
 | trans_send :
-    forall from to content cont gen sendings_l sendings_r actors_l actors_r,
-      (sendings_l ++ sendings_r)
-                 >< (actors_l ++ Build_actor from (send to content cont) gen :: actors_r)
-         ~(Send from to content)~>
-         (sendings_l ++ Build_sending to from content :: sendings_r)
-           >< (actors_l ++ Build_actor from cont gen :: actors_r)
+    forall from to msg
+           from_cont from_gen from_msgs from_f
+           to_actions to_gen to_msgs to_f
+           rest actors actors',
+      Permutation actors (
+                    {|
+                      actor_name := from;
+                      remaining_actions := send to msg from_cont;
+                      next_num := from_gen;
+                      behv := from_f;
+                      queue := from_msgs
+                    |} :: {|
+                      actor_name := to;
+                      remaining_actions := to_actions;
+                      next_num := to_gen;
+                      behv := to_f;
+                      queue := to_msgs
+                       |} :: rest) ->
+      Permutation actors' (
+                    {|
+                      actor_name := from;
+                      remaining_actions := from_cont;
+                      next_num := from_gen;
+                      behv := from_f;
+                      queue := from_msgs
+                    |} :: {|
+                         actor_name := to;
+                         remaining_actions := to_actions;
+                         next_num := to_gen;
+                         behv := to_f;
+                         queue := to_msgs ++ [:: msg]
+                       |} :: rest) ->
+      actors ~(Send from to msg)~> actors'
 (* new transition *)
 | trans_new :
-    forall parent behv cont gen sendings actors_l actors_r,
-      sendings >< (actors_l ++ Build_actor parent (new behv cont) gen :: actors_r)
-        ~(New (generated gen parent))~>
-        sendings ><
-          (Build_actor (generated gen parent) (become behv) 0 ::
-          actors_l ++
-          Build_actor parent (cont (generated gen parent)) (S gen) ::
-          actors_r)
+    forall parent parent_behv parent_cont gen parent_msgs
+           child_behv
+           rest actors actors',
+      Permutation actors (
+                    {|
+                      actor_name := parent;
+                      remaining_actions := new child_behv parent_cont;
+                      next_num := gen;
+                      behv := parent_behv;
+                      queue := parent_msgs
+                    |} :: rest) ->
+      Permutation actors' (
+                    {|
+                      actor_name := parent;
+                      remaining_actions := parent_cont (generated gen parent);
+                      next_num := gen;
+                      behv := parent_behv;
+                      queue := parent_msgs
+                    |} :: {|
+                      actor_name := generated gen parent;
+                      remaining_actions := become 0;
+                      next_num := 0;
+                      behv := child_behv;
+                      queue := [::]
+                    |} :: rest) ->
+      actors ~(New (generated gen parent))~> actors'
 (* self transition *)
 | trans_self :
-    forall me cont gen sendings actors_l actors_r,
-      sendings >< (actors_l ++ Build_actor me (self cont) gen :: actors_r)
-        ~(Self me)~>
-        sendings >< (actors_l ++ Build_actor me (cont me) gen :: actors_r)
+    forall me cont gen f msgs
+           rest actors actors',
+      Permutation actors (
+                    {|
+                      actor_name := me;
+                      remaining_actions := self cont;
+                      next_num := gen;
+                      behv := f;
+                      queue := msgs
+                    |} :: rest) ->
+      Permutation actors' (
+                    {|
+                      actor_name := me;
+                      remaining_actions := cont me;
+                      next_num := gen;
+                      behv := f;
+                      queue := msgs
+                    |} :: rest) ->
+      actors ~(Self me)~> actors'
 where "c1 '~(' t ')~>' c2" := (trans t c1 c2).
 
 Hint Constructors trans.
