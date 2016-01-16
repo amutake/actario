@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import syntax semantics util.
+Require Import syntax semantics.
 
 (* the following definitions are refered to:
  * Reynald Affeldt and Naoki Kobayashi, A Coq library for verification of concurrent programs, Electronic Notes in Theoretical Computer Science, 199:17-32, 2008
@@ -12,7 +12,7 @@ Definition is_transition_path (p : path) : Prop :=
   forall n,
     (forall c, p n = Some c ->
                (exists c' l, p (S n) = Some c' /\ c ~(l)~> c') \/
-               p (S n) = None) /\
+               (forall c' l, p (S n) = None /\ ~ (c ~(l)~> c'))) /\
     (p n = None -> p (S n) = None).
 
 Definition enabled (c : config) (l : label) : Prop :=

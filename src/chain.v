@@ -2,7 +2,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 
 Require Import Ssreflect.ssreflect Ssreflect.eqtype Ssreflect.seq Ssreflect.ssrbool Ssreflect.ssrnat.
-Require Import Coq.Program.Equality Coq.Bool.Bool.
+Require Import Coq.Program.Equality Coq.Bool.Bool Coq.Sorting.Permutation.
 Require Import util syntax semantics name_dec.
 
 (* 自分の親も必ず入っている (全部つながっている) *)
@@ -15,39 +15,34 @@ Definition chain (actors : seq actor) :=
       (map actor_name actors).
 
 Lemma new_trans_parent_exists :
-  forall flights flights' actors actors' child,
+  forall actors actors' child,
     child \in map actor_name actors' ->
-    (flights >< actors) ~(New child)~> (flights' >< actors') ->
+    actors ~(New child)~> actors' ->
     if child is generated _ p then
       p \in (map actor_name actors')
     else false. (* new_actor の名前が toplevel になることはありえないので大丈夫 *)
 Proof.
-  move=> flights flights' actors actors'.
+  move=> actors actors'.
   case.
   - move=> m H tr.
     inversion tr.
   - move=> g n H tr.
     inversion tr; subst; clear tr.
-    move=> /=; rewrite map_cat => /=.
-    rewrite in_cons.
-    rewrite mem_cat.
-    rewrite in_cons.
-    rewrite eq_refl.
-    simpl.
-    rewrite orb_true_r.
-    rewrite orb_true_r.
-    done.
+    eapply perm_map_in.
+    + apply Permutation_sym; apply H5.
+    + move=>/=; repeat rewrite in_cons; apply/or3P.
+      by apply Or32.
 Qed.
 
 Lemma new_trans_parent_exists' :
-  forall sendings sendings' actors actors' new_actor child,
+  forall actors actors' new_actor child,
     actor_name new_actor = child ->
-    sendings >< actors ~(New child)~> sendings' >< (new_actor :: actors') ->
+    actors ~(New child)~> (new_actor :: actors') ->
     if child is generated _ p then
       p \in (map actor_name (new_actor :: actors'))
     else false.
 Proof.
-  move=> sendings sendings' actors actors' new_actor child H.
+  move=> actors actors' new_actor child H.
   apply: new_trans_parent_exists.
   rewrite in_cons.
   move: H =>->.
@@ -56,17 +51,29 @@ Proof.
 Qed.
 
 Lemma new_trans_chain :
-  forall msgs msgs' actors actors' child,
+  forall actors actors' child,
     chain actors ->
-    (msgs >< actors) ~(New child)~> (msgs' >< actors') ->
+    (actors) ~(New child)~> (actors') ->
     chain actors'.
 Proof.
-  move=> msgs msgs' actors actors' child ch tr.
+  move=> actors actors' child ch tr.
   inversion tr; subst.
-  move/new_trans_parent_exists': tr.
+  move/(_ actors _ _ _ H1 tr): trans_perm_r=> tr'.
+  move/new_trans_parent_exists': tr'.
   rewrite/chain/=.
   have ggpeq : generated gen parent = generated gen parent by reflexivity.
   move/(_ ggpeq)=> pin_p.
+  eapply perm_map_all.
+  - move/Permutation_sym: H1; apply.
+  - simpl.
+    apply/andP; split.
+    + eapply perm_map_in.
+      * move/Permutation_sym: H1; apply.
+      * simpl.
+        repeat rewrite in_cons.
+        by apply/or3P; constructor 2.
+    + apply/andP; split.
+
   apply/andP; split; first done.
   move: ch.
   rewrite/chain/=; repeat (rewrite map_cat /=).

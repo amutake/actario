@@ -7,15 +7,15 @@ Require Import syntax.
 
 Section Label.
   Inductive label :=
-  | Receive (to : name) (from : name) (msg : message) (* `to` receives a message `content` from `from` *)
+  | Receive (to : name) (msg : message) (* `to` receives a message `content` *)
   | Send (from : name) (to : name) (content : message)    (* `from` sends a message `msg` to `to` *)
   | New (child : name)                                    (* an actor named `child` is created *)
   | Self (me : name).                                     (* `me` gets own name *)
 
   Definition eqlabel (l1 l2 : label) : bool :=
     match l1, l2 with
-      | Receive t1 f1 c1, Receive t2 f2 c2 =>
-        (t1 == t2) && (f1 == f2) && (c1 == c2)
+      | Receive t1 c1, Receive t2 c2 =>
+        (t1 == t2) && (c1 == c2)
       | Send f1 t1 c1, Send f2 t2 c2 =>
         (f1 == f2) && (t1 == t2) && (c1 == c2)
       | New c1, New c2 => c1 == c2
@@ -25,13 +25,11 @@ Section Label.
 
   Lemma eqlabelP : Equality.axiom eqlabel.
   Proof.
-    case=> [t1 f1 c1|f1 t1 c1|c1|m1] [t2 f2 c2|f2 t2 c2|c2|m2];
+    case=> [t1 c1|f1 t1 c1|c1|m1] [t2 c2|f2 t2 c2|c2|m2];
       try by constructor.
     - apply: (iffP andP).
-      + by case=> /andP []; do 3 move/eqP=> <-.
-      + case=> <- <- <-.
-        split; last exact: eqxx.
-        pose H := (rwP andP); apply H.
+      + by case=> []; do 2 move/eqP=> <-.
+      + case=> <- <-.
         split; exact: eqxx.
     - apply: (iffP andP).
       + by case=> /andP []; do 3 move/eqP=> <-.
@@ -57,7 +55,7 @@ Reserved Notation "c1 '~(' t ')~>' c2" (at level 60).
 Inductive trans : label -> config -> config -> Prop :=
 (* receive transition *)
 | trans_receive :
-    forall to from msg
+    forall to msg
            st next_state f gen msgs
            rest actors actors',
       Permutation actors (
@@ -77,7 +75,7 @@ Inductive trans : label -> config -> config -> Prop :=
                       behv := receive f;
                       queue := msgs
                     |} :: rest) ->
-      actors ~(Receive to from msg)~> actors'
+      actors ~(Receive to msg)~> actors'
 (* send transition *)
 | trans_send :
     forall from to msg
@@ -133,19 +131,20 @@ Inductive trans : label -> config -> config -> Prop :=
                     |} :: rest) ->
       Permutation actors' (
                     {|
-                      state_type := parent_st;
-                      actor_name := parent;
-                      remaining_actions := parent_cont (generated gen parent);
-                      next_num := gen;
-                      behv := parent_behv;
-                      queue := parent_msgs
-                    |} :: {|
                       state_type := child_st;
                       actor_name := generated gen parent;
                       remaining_actions := become child_ini;
                       next_num := 0;
                       behv := child_behv;
                       queue := [::]
+                    |} ::
+                    {|
+                      state_type := parent_st;
+                      actor_name := parent;
+                      remaining_actions := parent_cont (generated gen parent);
+                      next_num := S gen;
+                      behv := parent_behv;
+                      queue := parent_msgs
                     |} :: rest) ->
       actors ~(New (generated gen parent))~> actors'
 (* self transition *)
@@ -178,8 +177,68 @@ Hint Constructors trans.
 Reserved Notation "c1 '~>*' c2" (at level 70).
 
 Inductive trans_star : config -> config -> Prop :=
-| trans_refl : forall c, c ~>* c
+| trans_refl : forall c c',
+    Permutation c c' ->
+    c ~>* c'
 | trans_trans : forall c1 c2 c3, (exists label, c1 ~(label)~> c2) -> c2 ~>* c3 -> c1 ~>* c3
 where "c1 '~>*' c2" := (trans_star c1 c2).
 
 Hint Constructors trans_star.
+
+(* trans utils *)
+
+Lemma trans_perm_l :
+  forall c c' c'' l,
+    Permutation c c' ->
+    c ~(l)~> c'' ->
+    c' ~(l)~> c''.
+Proof.
+  move=> c c' c''.
+  case=> [ to msg | from to msg | child | me ];
+    move/Permutation_sym=> perm H; inversion H; subst.
+  - move: (Permutation_trans perm H2)=> perm'.
+    eapply trans_receive; [ apply perm' | by [] ].
+  - move: (Permutation_trans perm H5)=> perm'.
+    eapply trans_send; [ apply perm' | by [] ].
+  - move: (Permutation_trans perm H1)=> perm'.
+    eapply trans_new; [ apply perm' | by [] ].
+  - move: (Permutation_trans perm H1)=> perm'.
+    eapply trans_self; [ apply perm' | by [] ].
+Qed.
+
+Lemma trans_perm_r :
+  forall c c' c'' l,
+    Permutation c' c'' ->
+    c ~(l)~> c' ->
+    c ~(l)~> c''.
+Proof.
+  move=> c c' c''.
+  case=> [ to msg | from to msg | child | me ];
+    move/Permutation_sym=> perm H; inversion H; subst.
+  - move: (Permutation_trans perm H5)=> perm'.
+    eapply trans_receive; [ apply H2 | apply perm' ].
+  - move: (Permutation_trans perm H6)=> perm'.
+    eapply trans_send; [ apply H5 | apply perm' ].
+  - move: (Permutation_trans perm H2)=> perm'.
+    eapply trans_new; [ apply H1 | apply perm' ].
+  - move: (Permutation_trans perm H2)=> perm'.
+    eapply trans_self; [ apply H1 | apply perm' ].
+Qed.
+
+Lemma trans_nil_l :
+  forall c l, ~ ([::] ~(l)~> c).
+Proof.
+  move=> c l contra;
+    inversion contra; subst;
+    move: H;
+    apply/Permutation_nil_cons.
+Qed.
+
+Lemma trans_nil_r :
+  forall c l, ~ (c ~(l)~> [::]).
+Proof.
+  move=> c l contra;
+    inversion contra; subst;
+    move: H0;
+    apply/Permutation_nil_cons.
+Qed.
