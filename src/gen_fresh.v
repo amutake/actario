@@ -2,16 +2,17 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 
 Require Import Ssreflect.ssreflect Ssreflect.ssrfun Ssreflect.seq Ssreflect.ssrbool Ssreflect.eqtype Ssreflect.ssrnat.
-Require Import Coq.Lists.List Coq.Program.Equality Coq.Bool.Bool Coq.Sorting.Permutation.
+Require Import Coq.Program.Equality Coq.Bool.Bool Coq.Sorting.Permutation.
 Require Import util syntax semantics name_dec chain.
 
 Definition name_next (a : actor) := (actor_name a, next_num a).
 
 Definition gen_fresh (c : config) :=
-  forall child_gen parent_name parent_next,
-    (generated child_gen parent_name) \in [seq actor_name i | i <- c] ->
+  forall parent_name parent_next,
     (parent_name, parent_next) \in [seq name_next i | i <- c] ->
-    child_gen < parent_next.
+    forall child_gen,
+      (generated child_gen parent_name) \in [seq actor_name i | i <- c] ->
+      child_gen < parent_next.
 
 Theorem gen_fresh_soundness :
   forall c n x,
@@ -21,9 +22,9 @@ Theorem gen_fresh_soundness :
 Proof.
   move=> c n x.
   rewrite/gen_fresh.
-  move/(_ x n x)=> fr inp.
+  move/(_ n x)=> fr inp.
   apply/negP=> contra.
-  move/(_ contra inp): fr.
+  move/(_ inp x contra): fr.
   by rewrite ltnn.
 Qed.
 
@@ -35,10 +36,10 @@ Lemma perm_gen_fresh :
 Proof.
   move=> c c' perm.
   rewrite/gen_fresh.
-  move=> H child_gen parent_name parent_next child_in parent_in.
+  move=> H parent_name parent_next parent_in child_gen child_in.
   apply (perm_map_in (Permutation_sym perm)) in child_in.
   apply (perm_map_in (Permutation_sym perm)) in parent_in.
-  by move/(_ child_gen parent_name parent_next child_in parent_in): H.
+  by move/(_ parent_name parent_next parent_in child_gen child_in): H.
 Qed.
 
 Lemma gen_fresh_increase :
@@ -67,22 +68,26 @@ Proof.
                    parent_actions parent_behv parent_queue
                    parent_actions' parent_behv' parent_queue'
                    rest.
-  rewrite/gen_fresh/=.
-  move=> H child_gen pn px child_in; subst.
-  rewrite/name_next/=.
-  rewrite seq.in_cons.
+  rewrite/gen_fresh/name_next/=.
+  move=> H pn px parent_in child_gen child_in; subst.
+  move: parent_in; rewrite in_cons.
   case/orP.
-  - move/eqP=> ppeq; inversion ppeq; subst; clear ppeq.
-    move/(_ child_gen parent_name parent_next child_in): H.
-    rewrite/name_next/=; rewrite seq.in_cons=> ppin.
-    have ppeq : (parent_name, parent_next) == (parent_name, parent_next) by done.
-    have cplt : child_gen < parent_next by apply/ppin/orP; left.
-    rewrite ltnS.
-    by apply ltnW.
+  - case/eqP => ? ?; subst.
+    move/(_ parent_name parent_next _ child_gen child_in): H=> H.
+    by apply/ltnW/H; apply/orP; left.
   - move=> ppin.
-    move/(_ child_gen pn px child_in): H.
-    rewrite/name_next/=; rewrite seq.in_cons; apply.
+    move/(_ pn px _ child_gen child_in): H; apply.
     by apply/orP; right.
+Qed.
+
+Lemma gen_fresh_head :
+  forall a c,
+    gen_fresh (a :: c) ->
+    generated (next_num a) (actor_name a) \notin [seq actor_name i | i <- (a :: c)].
+Proof.
+  move=> a c fr.
+  move/(_ (a :: c) (actor_name a) (next_num a) fr): gen_fresh_soundness; apply.
+  by apply/orP; left.
 Qed.
 
 (* Definition name_next (a : actor) := (actor_name a, next_num a). *)
@@ -193,6 +198,36 @@ Qed.
 (*   - by move=> ->. *)
 (* Qed. *)
 
+Lemma perm_name_next_to_name :
+  forall c c',
+    Permutation (map name_next c) (map name_next c') ->
+    Permutation (map actor_name c) (map actor_name c').
+Proof.
+  move=> c c'.
+  have map_name_next_to_name :
+    forall c, map (fun p => p.1) (map name_next c) = map actor_name c
+      by elim=>//; by move=> /= ? ? ->.
+  move=> perm.
+  move: perm_map.
+  move/(_ _ _ _ _ (fun p => p.1) perm).
+    by repeat rewrite map_name_next_to_name.
+Qed.
+
+Lemma gen_fresh_decided_by_only_name_next :
+  forall c c',
+    Permutation (seq.map name_next c) (seq.map name_next c') ->
+    gen_fresh c ->
+    gen_fresh c'.
+Proof.
+  move=> c c' perm.
+  rewrite/gen_fresh/=.
+  move=> fr parent_name parent_next parent_in child_gen child_in.
+  move/(_ parent_name parent_next _ child_gen): fr; apply.
+  - by eapply (perm_in (Permutation_sym perm)).
+  - have perm' : Permutation [seq actor_name i | i <- c] [seq actor_name i | i <- c']
+      by apply perm_name_next_to_name.
+      by eapply (perm_in (Permutation_sym perm')).
+Qed.
 (* Lemma gen_fresh_decided_by_only_name_and_next_number : *)
 (*   forall actors actors', *)
 (*     map name_next actors = map name_next actors' -> *)

@@ -83,6 +83,18 @@ Proof.
   by apply/negP.
 Qed.
 
+Lemma chain_decided_by_only_name :
+  forall c c',
+    Permutation (map actor_name c) (map actor_name c') ->
+    chain c ->
+    chain c'.
+Proof.
+  move=> c c' perm.
+  rewrite/chain=> ch n p gen_in.
+  apply/(perm_in perm)/(ch n p).
+  by apply/(perm_in (Permutation_sym perm)).
+Qed.
+
 (* Lemma chain_chain' : *)
 (*   forall s, chain s -> chain' s. *)
 (* Proof. *)
