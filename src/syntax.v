@@ -121,7 +121,7 @@ Section Action.
   | self : (name -> actions state) -> actions state           (* CPS *)
   | become : state -> actions state                   (* become した後はアクションを取れない。become 以外は後に actions が続かなければならないので、次のメッセージを受け取れる状態になれば必ず become になる *)
   with behavior (state : Set) : Type :=
-  | receive : (message -> state -> actions state) -> behavior state.
+  | receive : (state -> message -> actions state) -> behavior state.
 
   (* eqactions, eqbehavior は定義できない。(2つの関数を受け取って bool を返すような関数を作らなければいけないから (同じ形をしているかどうかさえ判定してくれればそれでいいけど…)) *)
 
@@ -151,7 +151,7 @@ Record actor := {
 Definition config := seq actor.
 
 (* メッセージを受け取っても何もしない振る舞い *)
-Definition empty_behv (state : Set) : behavior state := receive (fun _ st => become st).
+Definition empty_behv (state : Set) : behavior state := receive (fun st _ => become st).
 
 (* 初期状態 *)
 (* toplevel アクター一つだけはちょっと強すぎるかもしれない？ *)

@@ -70,7 +70,7 @@ Inductive trans : label -> config -> config -> Prop :=
       Permutation actors' (
                     {|
                       actor_name := to;
-                      remaining_actions := (f msg next_state);
+                      remaining_actions := (f next_state msg);
                       next_num := gen;
                       behv := receive f;
                       queue := msgs
