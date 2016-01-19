@@ -216,11 +216,7 @@ and conv_expr fname zero env = function
   | MLapp (f, args) ->         (* 関数適用 *)
      let f = conv_expr fname false env f in (* ここだけ zero = false *)
      let args = List.map (conv_expr fname true env) args in
-     begin
-       match f with
-       | ErlFunName (MkAtom "init") -> List.nth args 1
-       | _ -> ErlApp (f, args)
-     end
+     ErlApp (f, args)
   | MLlam _ as a ->             (* 無名関数 *)
      let args, a' = collect_lams a in (* fun x -> fun y -> ... -> t を fun x y ... -> t にする *)
      let args, env' = push_vars (List.rev (map_id args)) env in (* 環境に入れる *)
@@ -269,18 +265,16 @@ let preamble mod_name used_modules usf =
 (* pp_function : global_reference -> ml_ast -> std_ppcmds *)
 let conv_function r lam =
   let fnamestr = pp_global Term r in
-  (* init だけ特別扱い (抽出しない) *)
-  if fnamestr = "init" then None else
-    let fname = MkAtom fnamestr in
-    (* collect_lams は mlutil.ml に定義されてて、
-     * fun x -> fun y -> fun z -> ... -> t みたいなのを、
-     * ([ x; y; z; ... ], t) にする
-     *)
-    let args, body = collect_lams lam in
-    let args, env = push_vars (map_id args) (empty_env ()) in
-    let args = List.map (fun v -> MkVar v) (List.rev args) in
-    let body = conv_expr fname true env body in
-    Some (ErlFun (fname, args, body))
+  let fname = MkAtom fnamestr in
+  (* collect_lams は mlutil.ml に定義されてて、
+   * fun x -> fun y -> fun z -> ... -> t みたいなのを、
+   * ([ x; y; z; ... ], t) にする
+   *)
+  let args, body = collect_lams lam in
+  let args, env = push_vars (map_id args) (empty_env ()) in
+  let args = List.map (fun v -> MkVar v) (List.rev args) in
+  let body = conv_expr fname true env body in
+  Some (ErlFun (fname, args, body))
 
 let pp_decl = function
   | Dind (_, _) -> mt ()        (* Inductive は何も出力しない *)
@@ -329,7 +323,7 @@ let name_arity_module el =
 let pp_struct st =
   let name_arity_pairs_par_module (mp, sel) =
     push_visible mp [];
-    let pairs = List.filter (fun (n, _) -> n <> "init") (name_arity_module sel) in
+    let pairs = name_arity_module sel in
     pop_visible ();
     pairs
   in
