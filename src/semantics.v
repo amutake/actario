@@ -64,15 +64,15 @@ Inductive trans : label -> config -> config -> Prop :=
                       actor_name := to;
                       remaining_actions := become next_state;
                       next_num := gen;
-                      behv := receive f;
+                      behv := f;
                       queue := (msg :: msgs)
                     |} :: rest) ->
       Permutation actors' (
                     {|
                       actor_name := to;
-                      remaining_actions := (f next_state msg);
+                      remaining_actions := interp (f next_state) msg;
                       next_num := gen;
-                      behv := receive f;
+                      behv := f;
                       queue := msgs
                     |} :: rest) ->
       actors ~(Receive to msg)~> actors'
