@@ -1,43 +1,49 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
+Require Import Coq.Sorting.Permutation.
 Require Import Ssreflect.ssreflect Ssreflect.ssrbool Ssreflect.seq Ssreflect.ssrnat.
-Require Import Actario.syntax Actario.semantics Actario.properties.
+Require Import Actario.syntax Actario.semantics Actario.fairness Actario.properties.
 
 (**
  * ref: An Algebraic Theory of Actors and its Actors and Application to a Simple Object-Based Language (Gul Agha, 2004)
  * page: 7
  *)
 
-CoFixpoint factorial_cont_behv (val : nat) (cust : name) : behavior :=
-  receive (fun msg =>
-         match msg with
-           | nat_msg arg =>
-             cust ! nat_msg (val * arg);
-             become empty_behv
-           | _ => become (factorial_cont_behv val cust)
-         end).
+Inductive ContState : Set :=
+| val_cust : nat -> name -> ContState
+| cont_done : ContState.
 
-CoFixpoint factorial_behv : behavior :=
+Definition factorial_cont_behv (state : ContState) : behavior ContState :=
+  receive (fun msg =>
+             match msg, state with
+             | nat_msg arg, val_cust val cust =>
+               cust ! nat_msg (val * arg);
+               become cont_done
+             | _, _ => become state
+             end).
+
+Definition factorial_behv (state : unit) : behavior unit :=
   receive (fun msg =>
          match msg with
            | tuple_msg (nat_msg 0) (name_msg cust) =>
              cust ! nat_msg 1;
-             become factorial_behv
+             become tt
            | tuple_msg (nat_msg (S n)) (name_msg cust) =>
-             cont <- new (factorial_cont_behv (S n) cust);
+             cont <- new factorial_cont_behv with (val_cust (S n) cust);
              me <- self;
              me ! tuple_msg (nat_msg n) (name_msg cont);
-             become factorial_behv
-           | _ => become factorial_behv
+             become tt
+           | _ => become tt
          end).
 
-Definition factorial_system (n : nat) (parent : name) : config :=
-  init "factorial" (
-         x <- new factorial_behv;
+Definition initial_actions (n : nat) (parent : name) := (
+         x <- new factorial_behv with tt;
          x ! tuple_msg (nat_msg n) (name_msg parent);
-         become empty_behv
-       ).
+         become tt).
+
+Definition factorial_system (n : nat) (parent : name) : config :=
+  init "factorial" (initial_actions n parent).
 
 Recursive ActorExtraction factorial_system.
 ActorExtraction "factorial" factorial_system.
@@ -57,100 +63,154 @@ Section FactorialCorrect.
    *   deliver_exists (factorial_system 0 parent) parent (nat_msg 1).
    * としたいが、external actor へのメッセージ送信には対応できていない
    *)
-  Theorem receive_1 :
-    receive_exists (factorial_system 0 (toplevel "factorial")) (toplevel "factorial") (nat_msg 1).
-  Proof.
-    pose (top := toplevel "factorial").
-    pose (factorial := (generated 0 top)).
+  Definition system_name := "factorial".
+  Definition top := toplevel system_name.
 
+  Theorem receive_0 :
+    eventually_receive (factorial_system 0 top) top (nat_msg 1).
+  Proof.
+    rewrite/eventually_receive/eventually_do_label/is_transition_path=> p p_ini p_is_path.
+    rewrite/eventually_processed.
+    pose (c0 := (factorial_system 0 top)).
+    set p_is_path as p1; move/(_ 0): p1.
+    case; move/(_ c0 p_ini).
+    case.
+    case=> c1.
+    case=> l1.
+    case=> p1.
+    rewrite/c0.
+    case: l1.
+    move=> to msg falso; inversion falso.
+
+
+
+
+
+    Focus 2.
+
+
+
+
+
+
+
+
+  Theorem receive_1 :
+    receive_exists (factorial_system 0 top) top (nat_msg 1).
+  Proof.
+    pose (factorial := (generated 0 top)).
     rewrite/receive_exists.
-    admit.
-    (* exists [], (become empty_behv), [], 1. *)
-    (* exists [actor_state factorial (become factorial_behv) 0], []. (* gen_number, actors_l, actors_r とか何でも良くない？ *) *)
-    (* simpl; split. *)
-    (* - unfold factorial_system. *)
-    (*   pose (fact_actor := actor_state factorial (become factorial_behv) [] 0). *)
-    (*   pose (top_actor := actor_state top (become empty_behv) [] 1). *)
-    (*   pose (msg0 := tuple_msg (nat_msg 0) (name_msg top)). *)
-    (*   pose (conf1 := conf [] *)
-    (*                       [ fact_actor; *)
-    (*                         actor_state top (factorial ! msg0; *)
-    (*                                          become empty_behv) [] 1 *)
-    (*                       ]). *)
-    (*   eapply trans_trans. *)
-    (*   (* 遷移を1つずつ証明しないといけなくて、かなり小規模なものでも粒度細かすぎてめんどくさい。。 *) *)
-    (*   { *)
-    (*     exists New. *)
-    (*     assert (init "factorial" ( *)
-    (*                    (x) <- new factorial_behv; *)
-    (*                    (x) ! msg0 ; become empty_behv *)
-    (*                  ) ~(New)~> conf1). *)
-    (*     { *)
-    (*       unfold init. *)
-    (*       apply trans_new with (actors_l := []). *)
-    (*     } *)
-    (*     apply H. *)
-    (*   } *)
-    (*   pose (conf2 := conf [send_message factorial msg0] *)
-    (*                       [ fact_actor; top_actor ]). *)
-    (*   eapply trans_trans. *)
-    (*   { *)
-    (*     exists Send. *)
-    (*     assert (conf1 ~(Send)~> conf2). *)
-    (*     { *)
-    (*       apply trans_send with (actors_l := [fact_actor]). *)
-    (*     } *)
-    (*     apply H. *)
-    (*   } *)
-    (*   pose (conf3 := conf [] *)
-    (*                       [ actor_state factorial (become factorial_behv) [msg0] 0; *)
-    (*                         top_actor]). *)
-    (*   eapply trans_trans. *)
-    (*   { *)
-    (*     exists Deliver. *)
-    (*     assert (conf2 ~(Deliver)~> conf3). *)
-    (*     { *)
-    (*       apply trans_deliver with (actors_l := []). *)
-    (*     } *)
-    (*     apply H. *)
-    (*   } *)
-    (*   pose (conf4 := conf [] *)
-    (*                       [ actor_state factorial (top ! nat_msg 1; become factorial_behv) [] 0; *)
-    (*                         top_actor]). *)
-    (*   eapply trans_trans. *)
-    (*   { *)
-    (*     exists Open. *)
-    (*     assert (conf3 ~(Open)~> conf4). *)
-    (*     { *)
-    (*       apply trans_open with (actors_l := []). *)
-    (*     } *)
-    (*     apply H. *)
-    (*   } *)
-    (*   pose (conf5 := conf [send_message top (nat_msg 1)] [fact_actor; top_actor]). *)
-    (*   eapply trans_trans. *)
-    (*   { *)
-    (*     exists Send. *)
-    (*     assert (conf4 ~(Send)~> conf5). *)
-    (*     { *)
-    (*       apply trans_send with (actors_l := []). *)
-    (*     } *)
-    (*     apply H. *)
-    (*   } *)
-    (*   apply trans_refl. *)
-    (* - exists (conf [] *)
-    (*                [ actor_state factorial (become factorial_behv) [] 0; *)
-    (*                  actor_state top (become empty_behv) [nat_msg 1] 1]). *)
-    (*   apply trans_deliver with (actors_l := [actor_state factorial (become factorial_behv) [] 0]). *)
+    eexists; eexists.
+    split.
+    - rewrite/factorial_system/init/initial_actions => //.
+      eapply trans_trans.
+      {
+        exists (New factorial).
+        apply/trans_new.
+        Focus 10.
+        apply/Permutation_refl.
+        Focus 2.
+        apply/Permutation_refl.
+      }
+      eapply trans_trans.
+      {
+        exists (Send top factorial (tuple_msg (nat_msg 0) (name_msg top))).
+        apply/trans_send.
+        Focus 13.
+        apply/perm_swap.
+        Focus 2.
+        apply/perm_swap.
+      }
+      eapply trans_trans.
+      {
+        exists (Receive factorial top (tuple_msg (nat_msg 0) (name_msg top))).
+        apply/trans_receive.
+        Focus 8.
+        apply/Permutation_refl.
+        Focus 2.
+        apply/Permutation_refl.
+      }
+      eapply trans_trans.
+      {
+        exists (Send factorial top (nat_msg 1)).
+        apply/trans_send.
+        Focus 13.
+        apply/Permutation_refl.
+        Focus 2.
+        apply/Permutation_refl.
+      }
+      eapply trans_refl.
+      apply/perm_swap.
+    - eexists.
+      apply/trans_receive.
+      Focus 9.
+      apply/Permutation_refl.
+      Focus 3.
+      apply/Permutation_refl.
+      apply factorial.
   Qed.
 
   Theorem receive_n :
     forall n,
-      receive_exists (factorial_system n (toplevel "factorial")) (toplevel "factorial") (nat_msg (fact n)).
+      receive_exists (factorial_system n top) top (nat_msg (fact n)).
   Proof.
+    pose (factorial := generated 0 top).
     move=> n.
+    rewrite/receive_exists.
+    eexists.
+    exists (generated 0 factorial).
+    split.
+    case: n.
+
+
+
+
     elim: n.
     - exact: receive_1.
     - rewrite/receive_exists; move=> n.
+      case; move=> actors; case=> from; case=> fact_n; case=> actors' IH.
+      eexists.
+      exists from.
+      split.
+      + rewrite/factorial_system/init/initial_actions.
+        eapply trans_trans.
+        {
+          exists (New factorial).
+          apply/trans_new.
+          Focus 10.
+          apply/Permutation_refl.
+          Focus 2.
+          apply/Permutation_refl.
+        }
+        eapply trans_trans.
+        {
+          exists (Send top factorial (tuple_msg (nat_msg n.+1) (name_msg top))).
+          apply/trans_send.
+          Focus 13.
+          apply/perm_swap.
+          Focus 2.
+          apply/perm_swap.
+        }
+        eapply trans_trans.
+        {
+          exists (Receive factorial top (tuple_msg (nat_msg n.+1) (name_msg top))).
+          apply/trans_receive.
+          Focus 8.
+          apply/Permutation_refl.
+          Focus 2.
+          apply/Permutation_refl.
+        }
+        eapply trans_trans.
+        {
+          exists (New (generated 0 factorial)).
+          apply/trans_new.
+          Focus 10.
+          apply/Permutation_refl.
+          Focus 2.
+          apply/Permutation_refl.
+        }
+
+
       case; move=> [ sendings actors ]; case=> from; case=> fact_n; case=> c' IH.
       exists ([:: Build_sending (toplevel "factorial") (generated 0 (generated 0 (toplevel "factorial"))) (nat_msg (fact n+1))] ><
                                                                                                                                 (take n actors ++
