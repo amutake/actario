@@ -2,7 +2,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 
 Require Import Coq.Sorting.Permutation.
-Require Import Actario.syntax Actario.semantics Actario.fairness Actario.properties.
+Require Import Actario.syntax Actario.semantics.
 
 (**
  * ref: An Algebraic Theory of Actors and its Actors and Application to a Simple Object-Based Language (Gul Agha, 2004)
@@ -43,11 +43,12 @@ ActorExtraction "factorial" factorial_behv.
 
 Section Verification.
   Require Import Ssreflect.ssreflect Ssreflect.ssrbool Ssreflect.seq Ssreflect.ssrnat.
+  Require Import Actario.fairness Actario.properties.
 
   Definition initial_actions (n : nat) (parent : name) := (
     x <- new factorial_behv with tt;
     x ! tuple_msg (nat_msg n) (name_msg parent);
-    become tt).
+    become done).
 
   Definition factorial_system (n : nat) (parent : name) : config :=
     init "factorial" (initial_actions n parent).
@@ -69,160 +70,36 @@ Section Verification.
   Definition system_name := "factorial".
   Definition top := toplevel system_name.
 
+  Ltac unfold_eventually u :=
+    rewrite/u/eventually_do_label/eventually_processed.
+
+  Ltac step p_is_path p :=
+    move/(_ _ _ _ p_is_path p): trace_path;
+    rewrite/calc_trans/=.
+
+  Ltac step_until_stop is_path p0 :=
+    let P := fresh "p" in
+    try (progress step is_path p0=> P; step_until_stop is_path P).
+
+  Ltac finish i p p' :=
+    exists i; eexists; eexists;
+    split; last split; [ apply p | apply p' | ];
+    (eapply trans_receive || eapply trans_send || eapply trans_new || eapply trans_self);
+    apply/Permutation_refl.
+
   Theorem receive_0 :
     eventually_receive (factorial_system 0 top) top (nat_msg 1).
   Proof.
-    rewrite/eventually_receive/eventually_do_label/is_transition_path=> p p_ini p_is_path.
-    rewrite/eventually_processed.
-    pose (c0 := (factorial_system 0 top)).
-    set p_is_path as p1; move/(_ 0): p1.
-    case; move/(_ c0 p_ini).
-    case.
-    case=> c1.
-    case=> l1.
-    case=> p1.
-    rewrite/c0.
-    case: l1.
-    move=> to msg falso; inversion falso.
+    unfold_eventually eventually_receive=> p p0 is_path.
+    step_until_stop is_path p0.
+    finish 4 p4 p5.
+  Qed.
 
-
-
-
-
-    Focus 2.
-
-
-
-
-
-
-
-
-      Theorem receive_1 :
-        receive_exists (factorial_system 0 top) top (nat_msg 1).
-      Proof.
-        pose (factorial := (generated 0 top)).
-        rewrite/receive_exists.
-        eexists; eexists.
-        split.
-        - rewrite/factorial_system/init/initial_actions => //.
-          eapply trans_trans.
-          {
-            exists (New factorial).
-            apply/trans_new.
-            Focus 10.
-            apply/Permutation_refl.
-            Focus 2.
-            apply/Permutation_refl.
-          }
-          eapply trans_trans.
-          {
-            exists (Send top factorial (tuple_msg (nat_msg 0) (name_msg top))).
-            apply/trans_send.
-            Focus 13.
-            apply/perm_swap.
-            Focus 2.
-            apply/perm_swap.
-          }
-          eapply trans_trans.
-          {
-            exists (Receive factorial top (tuple_msg (nat_msg 0) (name_msg top))).
-            apply/trans_receive.
-            Focus 8.
-            apply/Permutation_refl.
-            Focus 2.
-            apply/Permutation_refl.
-          }
-          eapply trans_trans.
-          {
-            exists (Send factorial top (nat_msg 1)).
-            apply/trans_send.
-            Focus 13.
-            apply/Permutation_refl.
-            Focus 2.
-            apply/Permutation_refl.
-          }
-          eapply trans_refl.
-          apply/perm_swap.
-        - eexists.
-          apply/trans_receive.
-          Focus 9.
-          apply/Permutation_refl.
-          Focus 3.
-          apply/Permutation_refl.
-          apply factorial.
-      Qed.
-
-      Theorem receive_n :
-        forall n,
-          receive_exists (factorial_system n top) top (nat_msg (fact n)).
-      Proof.
-        pose (factorial := generated 0 top).
-        move=> n.
-        rewrite/receive_exists.
-        eexists.
-        exists (generated 0 factorial).
-        split.
-        case: n.
-
-
-
-
-        elim: n.
-        - exact: receive_1.
-        - rewrite/receive_exists; move=> n.
-          case; move=> actors; case=> from; case=> fact_n; case=> actors' IH.
-          eexists.
-          exists from.
-          split.
-          + rewrite/factorial_system/init/initial_actions.
-            eapply trans_trans.
-            {
-              exists (New factorial).
-              apply/trans_new.
-              Focus 10.
-              apply/Permutation_refl.
-              Focus 2.
-              apply/Permutation_refl.
-            }
-            eapply trans_trans.
-            {
-              exists (Send top factorial (tuple_msg (nat_msg n.+1) (name_msg top))).
-              apply/trans_send.
-              Focus 13.
-              apply/perm_swap.
-              Focus 2.
-              apply/perm_swap.
-            }
-            eapply trans_trans.
-            {
-              exists (Receive factorial top (tuple_msg (nat_msg n.+1) (name_msg top))).
-              apply/trans_receive.
-              Focus 8.
-              apply/Permutation_refl.
-              Focus 2.
-              apply/Permutation_refl.
-            }
-            eapply trans_trans.
-            {
-              exists (New (generated 0 factorial)).
-              apply/trans_new.
-              Focus 10.
-              apply/Permutation_refl.
-              Focus 2.
-              apply/Permutation_refl.
-            }
-
-
-            case; move=> [ sendings actors ]; case=> from; case=> fact_n; case=> c' IH.
-            exists ([:: Build_sending (toplevel "factorial") (generated 0 (generated 0 (toplevel "factorial"))) (nat_msg (fact n+1))] ><
-                                                                                                                                      (take n actors ++
-                                                                                                                                            [:: Build_actor (generated 0 (generated 0 (toplevel "factorial"))) (become empty_behv) 0
-                                                                                                                                             ; Build_actor (generated 0 (toplevel "factorial")) (become empty_behv) n.+2
-                                                                                                                                             ; Build_actor (toplevel "factorial") (become empty_behv) 1])).
-            exists (generated 0 (generated 0 (toplevel "factorial"))).
-            split.
-          + rewrite/factorial_system/init.
-            apply: trans_trans.
-      Admitted.
+  Theorem receive_3 :
+    eventually_receive (factorial_system 3 top) top (nat_msg 6).
+  Proof.
+    unfold_eventually eventually_receive=> p p0 is_path.
+    step_until_stop is_path p0.
+    finish 22 p22 p23.
+  Qed.
 End Verification.

@@ -8,12 +8,11 @@ Require Import Ssreflect.ssreflect Ssreflect.eqtype Ssreflect.seq Ssreflect.ssrb
 Require Import ssrstring.
 
 Notation machine_addr := string.
-Notation gen_number := nat.
 
 Section Name.
   Inductive name : Set :=
   | toplevel : machine_addr -> name
-  | generated : gen_number -> name -> name. (* ユーザーに generated というコンストラクタを使わせたくないのだけどできる？ *)
+  | generated : nat -> name -> name. (* ユーザーに generated というコンストラクタを使わせたくないのだけどできる？ *)
 
   Fixpoint eqname (n1 n2 : name) : bool :=
     match n1, n2 with
@@ -146,7 +145,7 @@ Record actor := {
                  state_type : Set;
                  actor_name : name;
                  remaining_actions : actions state_type;
-                 next_num : gen_number;
+                 next_num : nat;
                  behv : behavior_template state_type;
                  queue : seq message
                }.
@@ -158,30 +157,38 @@ Definition config := seq actor.
 (* メッセージを受け取っても何もしない振る舞い *)
 Definition empty_behv {state : Set} (st : state) : behavior state := receive (fun _ => become st).
 
+Inductive initializer_state := start | done.
+
 (* 初期状態 *)
 (* toplevel アクター一つだけはちょっと強すぎるかもしれない？ *)
 Inductive initial_config : config -> Prop :=
 | init_conf : forall machine actions,
     initial_config ([:: {|
                          actor_name := toplevel machine;
-                         state_type := unit;
+                         state_type := initializer_state;
                          remaining_actions := actions;
                          next_num := 0;
-                         behv := fun _ => receive (fun _ => actions);
+                         behv := fun st => match st with
+                                           | start => receive (fun _ => actions)
+                                           | done => empty_behv done
+                                           end;
                          queue := [::]
                        |}]).
 
 Hint Constructors initial_config.
 
 (* initial config を作るやつ *)
-Definition init (sys_name : string) (actions : actions unit) : config :=
+Definition init (sys_name : string) (actions : actions initializer_state) : config :=
   [::
      {|
        actor_name := toplevel sys_name;
-       state_type := unit;
+       state_type := initializer_state;
        remaining_actions := actions;
        next_num := 0;
-       behv := fun _ => receive (fun _ => actions);
+       behv := fun st => match st with
+                         | start => receive (fun _ => actions)
+                         | done => receive (fun _ => become done)
+                         end;
        queue := [::]
      |}].
 

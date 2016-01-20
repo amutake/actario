@@ -1,6 +1,7 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
+Require Import Coq.Sorting.Permutation.
 Require Import syntax semantics.
 
 (* the following definitions are refered to:
@@ -9,11 +10,23 @@ Require Import syntax semantics.
 Definition path := nat -> option config.
 
 Definition is_transition_path (p : path) : Prop :=
-  forall n,
-    (forall c, p n = Some c ->
-               (exists c' l, p (S n) = Some c' /\ c ~(l)~> c') \/
-               (forall c' l, p (S n) = None /\ ~ (c ~(l)~> c'))) /\
-    (p n = None -> p (S n) = None).
+  forall i,
+    (forall c, p i = Some c ->
+               ((forall c' l, ~ (c ~(l)~> c')) -> p (S i) = None) \/ (* stuck case *)
+               (exists c', p (S i) = Some c' -> exists l, c ~(l)~> c')) /\ (* progress case *)
+    (p i = None -> p (S i) = None).
+
+(* this would be removed *)
+Axiom path_perm :
+  forall p p',
+    is_transition_path p ->
+    is_transition_path p' ->
+    (forall i,
+        (p i = None <-> p' i = None) /\
+        (forall c c',
+            (p i = Some c -> p' i = Some c' /\ Permutation c c') /\
+            (p' i = Some c' -> p i = Some c /\ Permutation c c'))) ->
+    p = p'.
 
 Definition enabled (c : config) (l : label) : Prop :=
   exists c', c ~(l)~> c'.
