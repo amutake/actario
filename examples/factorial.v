@@ -43,7 +43,7 @@ ActorExtraction "factorial" factorial_behv.
 
 Section Verification.
   Require Import Ssreflect.ssreflect Ssreflect.ssrbool Ssreflect.seq Ssreflect.ssrnat.
-  Require Import Actario.fairness Actario.properties.
+  Require Import Actario.auto Actario.specification Actario.tactics.
 
   Definition initial_actions (n : nat) (parent : name) := (
     x <- new factorial_behv with tt;
@@ -69,23 +69,6 @@ Section Verification.
    *)
   Definition system_name := "factorial".
   Definition top := toplevel system_name.
-
-  Ltac unfold_eventually u :=
-    rewrite/u/eventually_do_label/eventually_processed.
-
-  Ltac step p_is_path p :=
-    move/(_ _ _ _ p_is_path p): trace_path;
-    rewrite/calc_trans/=.
-
-  Ltac step_until_stop is_path p0 :=
-    let P := fresh "p" in
-    try (progress step is_path p0=> P; step_until_stop is_path P).
-
-  Ltac finish i p p' :=
-    exists i; eexists; eexists;
-    split; last split; [ apply p | apply p' | ];
-    (eapply trans_receive || eapply trans_send || eapply trans_new || eapply trans_self);
-    apply/Permutation_refl.
 
   Theorem receive_0 :
     eventually_receive (factorial_system 0 top) top (nat_msg 1).

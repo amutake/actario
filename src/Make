@@ -1,13 +1,20 @@
+# basic
 ssrascii.v
 ssrstring.v
-util.v
 syntax.v
+fairness.v
+properties.v
+
+# for name uniqueness
+util.v
 name_dec.v
 semantics.v
 chain.v
 gen_fresh.v
 no_dup.v
 trans_invariant.v
-properties.v
-fairness.v
-persistence.v
+
+# spec & proof mechanism
+specification.v
+auto.v
+tactics.v

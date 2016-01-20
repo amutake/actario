@@ -34,5 +34,7 @@ src/gen_fresh.v
 src/no_dup.v
 src/trans_invariant.v
 
-# other properties
-src/persistence.v
+# spec & proof mechanism
+src/specification.v
+src/auto.v
+src/tactics.v
