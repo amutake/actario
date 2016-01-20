@@ -48,7 +48,7 @@ Definition echo_init_system : config :=
          server <- new echo_server_behavior with tt; (* サーバーを作る *)
          client <- new echo_client_behavior with server; (* クライアントを作る *)
          client ! empty_msg; (* クライアントを走らせる *)
-         become tt (* それ以降は何もしない *)
+         become done (* それ以降は何もしない *)
        ).
 
 Recursive ActorExtraction empty_behv.
