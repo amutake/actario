@@ -18,16 +18,22 @@ plugin/actor_extract_env.mli
 plugin/g_actor_extraction.ml4
 plugin/actor_extraction_plugin.mllib
 
+# basic
 src/ssrascii.v
 src/ssrstring.v
-src/util.v
 src/syntax.v
+
+# for name uniqueness
+src/util.v
 src/name_dec.v
 src/semantics.v
 src/chain.v
 src/gen_fresh.v
 src/no_dup.v
 src/trans_invariant.v
-src/properties.v
+
+# spec & proof mechanism
 src/fairness.v
-src/persistence.v
+src/specification.v
+src/auto.v
+src/tactics.v

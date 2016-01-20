@@ -4,25 +4,25 @@ Unset Strict Implicit.
 Require Import Actario.syntax Actario.semantics.
 
 (* 受け取ったメッセージを送ってきたアクターにそのまま返す *)
-CoFixpoint echo_server_behavior : behavior :=
+Definition echo_server_behavior (state : unit) : behavior unit :=
   receive (fun msg =>
          match msg with
            | tuple_msg (name_msg sender) content =>
              sender ! content;
-             become echo_server_behavior
-           | _ => become echo_server_behavior
+             become state
+           | _ => become state
          end).
 (* これを Erlang に抽出すると以下のようになる。
  *
- * echo_server_behavior() ->
+ * echo_server_behavior(State) ->
  *     receive
  *         Msg ->
  *             case Msg of
  *                 {tuple_msg, {name_msg, Sender}, Content} ->
  *                     Sender ! Content,
- *                     echo_server_behavior();
+ *                     echo_server_behavior(State);
  *                 _ ->
- *                     echo_server_behavior()
+ *                     echo_server_behavior(State)
  *             end
  *     end.
  *
@@ -36,24 +36,23 @@ CoFixpoint echo_server_behavior : behavior :=
 
 (* サーバに Hello! というメッセージを送り続ける *)
 (* echo_server に送ったとき、ちゃんと Hello! が返ってきたことを確かめるには？ *)
-CoFixpoint echo_client_behavior (server : name) : behavior :=
+Definition echo_client_behavior (server : name) : behavior name :=
   receive (fun _ =>
          me <- self;
          server ! (tuple_msg (name_msg me) (str_msg "Hello!"));
-         become (echo_client_behavior server)
+         become server
       ).
 
 Definition echo_init_system : config :=
   init "echo-system" (
-         server <- new echo_server_behavior; (* サーバーを作る *)
-         client <- new (echo_client_behavior server); (* クライアントを作る *)
+         server <- new echo_server_behavior with tt; (* サーバーを作る *)
+         client <- new echo_client_behavior with server; (* クライアントを作る *)
          client ! empty_msg; (* クライアントを走らせる *)
-         become empty_behv (* それ以降は何もしない *)
+         become done (* それ以降は何もしない *)
        ).
 
-ActorExtraction empty_behv.
-ActorExtraction echo_server_behavior.
-ActorExtraction echo_client_behavior.
-ActorExtraction echo_init_system.
+Recursive ActorExtraction empty_behv.
+Recursive ActorExtraction echo_server_behavior.
+Recursive ActorExtraction echo_client_behavior.
 Recursive ActorExtraction echo_init_system.
 ActorExtraction "echo.erl" echo_init_system.

@@ -8,12 +8,11 @@ Require Import Ssreflect.ssreflect Ssreflect.eqtype Ssreflect.seq Ssreflect.ssrb
 Require Import ssrstring.
 
 Notation machine_addr := string.
-Notation gen_number := nat.
 
 Section Name.
   Inductive name : Set :=
   | toplevel : machine_addr -> name
-  | generated : gen_number -> name -> name. (* ユーザーに generated というコンストラクタを使わせたくないのだけどできる？ *)
+  | generated : nat -> name -> name. (* ユーザーに generated というコンストラクタを使わせたくないのだけどできる？ *)
 
   Fixpoint eqname (n1 n2 : name) : bool :=
     match n1, n2 with
@@ -114,89 +113,89 @@ Section Action.
    *   become behv
    * とかするから、actions も CoInductive で良さそう
    *)
-  CoInductive actions : Type :=
-  | new : behavior -> (name -> actions) -> actions (* CPS *)
-  | send : name -> message -> actions -> actions   (* send n m a == n ! m; a *)
-  | self : (name -> actions) -> actions            (* CPS *)
-  | become : behavior -> actions                   (* become した後はアクションを取れない。become 以外は後に actions が続かなければならないので、次のメッセージを受け取れる状態になれば必ず become になる *)
-  with behavior : Type :=
-  | receive : (message -> actions) -> behavior.
+  (* use nat as state *)
+  Inductive actions (state : Set) : Type :=
+  | new : forall child_state : Set, (child_state -> behavior child_state) -> child_state -> (name -> actions state) -> actions state (* CPS, initial state is 0 *)
+  | send : name -> message -> actions state -> actions state   (* send n m a == n ! m; a *)
+  | self : (name -> actions state) -> actions state           (* CPS *)
+  | become : state -> actions state                   (* become した後はアクションを取れない。become 以外は後に actions が続かなければならないので、次のメッセージを受け取れる状態になれば必ず become になる *)
+  with behavior (state : Set) : Type :=
+  | receive : (message -> actions state) -> behavior state.
+
+  Definition behavior_template (state : Set) := state -> behavior state.
+  Definition interp {state : Set} (b : behavior state) (m : message) : actions state :=
+    match b with
+    | receive f => f m
+    end.
+  (* eqactions, eqbehavior は定義できない。(2つの関数を受け取って bool を返すような関数を作らなければいけないから (同じ形をしているかどうかさえ判定してくれればそれでいいけど…)) *)
 
   (* Lemma "アクションに終わりがあるなら、アクションの最後は become しか来ない"
    * CoInductive なので action := send name msg action みたいなのが書けるから自明ではないんだけど、これ証明できるの？
    * become = "ある振る舞いでもって、次のメッセージの待ち状態になる" という意味だからいいのか
+   * => CoInductive ではなくなった
    *)
 End Action.
 
-Notation "n '<-' 'new' behv ; cont" := (new behv (fun n => cont)) (at level 0, cont at level 10).
+Notation "n '<-' 'new' behv 'with' ini ; cont" := (new behv ini (fun n => cont)) (at level 0, cont at level 10).
 Notation "n '!' m ';' a" := (send n m a) (at level 0, a at level 10).
 Notation "me '<-' 'self' ';' cont" := (self (fun me => cont)) (at level 0, cont at level 10).
 
-Section Sending.
-  Record sending := {
-                     sending_to : name;
-                     sending_from : name;
-                     sending_content : message
-                   }.
-
-  Definition eqsending (s1 s2 : sending) :=
-    match s1, s2 with
-      | Build_sending to1 fr1 c1, Build_sending to2 fr2 c2 =>
-        (to1 == to2) && (fr1 == fr2) && (c1 == c2)
-    end.
-
-  Lemma eqsendingP : Equality.axiom eqsending.
-  Proof.
-    case=> [to1 fr1 c1] [to2 fr2 c2].
-    simpl.
-    apply: (iffP andP).
-    - case=> /andP [].
-        by do 3!move/eqP=> <-.
-    - case=> <- <- <-.
-      split; [ pose H := (rwP andP); apply H; split |];
-        exact: eqxx.
-  Qed.
-
-  Canonical sending_eqMixin := EqMixin eqsendingP.
-  Canonical sending_eqType := Eval hnf in EqType sending sending_eqMixin.
-End Sending.
-
 (* Build_actor (このアクターの名前) (まだ実行していないアクション) (生成番号) *)
 Record actor := {
+                 state_type : Set;
                  actor_name : name;
-                 remaining_actions : actions;
-                 next_num : gen_number
+                 remaining_actions : actions state_type;
+                 next_num : nat;
+                 behv : behavior_template state_type;
+                 queue : seq message
                }.
 (* behavior は持ってない。actions の最後に次の behavior が来るのと、アクションをし終わった (つまり become がでてきた) 状態のアクターしかメッセージを受け取れないので。でもこれはアクターとしてどうなの？外からは見えないものだけど。。 *)
 (* あと、グローバルメッセージキューの他に actor もメッセージキューを持つようにしたい。グローバルキューだけだと、先頭のメッセージの宛先のアクターがいつまでたっても仕事が終わらないとき、他のアクターはメッセージを受け取れない -> configuration の中のメッセージの順番をなくせばOK *)
 
-Record config := {
-                  sending_messages : seq sending;
-                  actors : seq actor
-                }.
-(* config が list sending を持つメリットはある？External Actor への送信とか？ -> アクターとしては一般的な定義 *)
-
-Notation "s >< a" := (Build_config s a) (at level 50, no associativity).
+Definition config := seq actor.
 
 (* メッセージを受け取っても何もしない振る舞い *)
-CoFixpoint empty_behv : behavior := receive (fun _ => become empty_behv).
+Definition empty_behv {state : Set} (st : state) : behavior state := receive (fun _ => become st).
+
+Inductive initializer_state := start | done.
 
 (* 初期状態 *)
 (* toplevel アクター一つだけはちょっと強すぎるかもしれない？ *)
 Inductive initial_config : config -> Prop :=
 | init_conf : forall machine actions,
-                initial_config ([::] >< [:: Build_actor (toplevel machine) actions 0]).
+    initial_config ([:: {|
+                         actor_name := toplevel machine;
+                         state_type := initializer_state;
+                         remaining_actions := actions;
+                         next_num := 0;
+                         behv := fun st => match st with
+                                           | start => receive (fun _ => actions)
+                                           | done => empty_behv done
+                                           end;
+                         queue := [::]
+                       |}]).
 
 Hint Constructors initial_config.
 
 (* initial config を作るやつ *)
-Definition init (sys_name : string) (initial_actions : actions) : config :=
-  [::] >< [:: Build_actor (toplevel sys_name) initial_actions 0 ].
+Definition init (sys_name : string) (actions : actions initializer_state) : config :=
+  [::
+     {|
+       actor_name := toplevel sys_name;
+       state_type := initializer_state;
+       remaining_actions := actions;
+       next_num := 0;
+       behv := fun st => match st with
+                         | start => receive (fun _ => actions)
+                         | done => receive (fun _ => become done)
+                         end;
+       queue := [::]
+     |}].
 
 Lemma init_is_initial_config :
-  forall sys_name actions,
-    initial_config (init sys_name actions).
+  forall sys_name behv,
+    initial_config (init sys_name behv).
 Proof.
-  move=> sys_name actions.
+  move=> sys_name behv.
   constructor.
 Qed.

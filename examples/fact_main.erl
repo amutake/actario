@@ -2,7 +2,8 @@
 -export([fact/1]).
 
 fact(N) ->
-    _ = spawn(factorial, factorial_system, [int2nat(N), self()]),
+    FactorialActor = spawn(fun() -> factorial:factorial_behv({tt}) end),
+    FactorialActor ! {tuple_msg, {nat_msg, int2nat(N)}, {name_msg, self()}},
     receive
         {nat_msg, Result} ->
             io:fwrite("fact(~w) = ~w~n", [N, nat2int(Result)]);
