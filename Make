@@ -22,8 +22,6 @@ plugin/actor_extraction_plugin.mllib
 src/ssrascii.v
 src/ssrstring.v
 src/syntax.v
-src/fairness.v
-src/properties.v
 
 # for name uniqueness
 src/util.v
@@ -35,6 +33,7 @@ src/no_dup.v
 src/trans_invariant.v
 
 # spec & proof mechanism
+src/fairness.v
 src/specification.v
 src/auto.v
 src/tactics.v

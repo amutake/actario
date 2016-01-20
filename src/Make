@@ -2,8 +2,6 @@
 ssrascii.v
 ssrstring.v
 syntax.v
-fairness.v
-properties.v
 
 # for name uniqueness
 util.v
@@ -15,6 +13,7 @@ no_dup.v
 trans_invariant.v
 
 # spec & proof mechanism
+fairness.v
 specification.v
 auto.v
 tactics.v
