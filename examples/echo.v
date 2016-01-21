@@ -4,25 +4,25 @@ Unset Strict Implicit.
 Require Import Actario.syntax Actario.semantics.
 
 (* 受け取ったメッセージを送ってきたアクターにそのまま返す *)
-Definition echo_server_behavior (state : unit) : behavior unit :=
+Definition server_behavior (state : unit) : behavior unit :=
   receive (fun msg =>
          match msg with
-           | tuple_msg (name_msg sender) content =>
-             sender ! content;
+           | tuple_msg (name_msg sender) (str_msg "ping") =>
+             sender ! (str_msg "pong");
              become state
            | _ => become state
          end).
 (* これを Erlang に抽出すると以下のようになる。
  *
- * echo_server_behavior(State) ->
+ * server_behavior(State) ->
  *     receive
  *         Msg ->
  *             case Msg of
- *                 {tuple_msg, {name_msg, Sender}, Content} ->
- *                     Sender ! Content,
- *                     echo_server_behavior(State);
+ *                 {tuple_msg, {name_msg, Sender}, {str_msg, {...(means ping)}}} ->
+ *                     Sender ! {...(means pong)},
+ *                     server_behavior(State);
  *                 _ ->
- *                     echo_server_behavior(State)
+ *                     server_behavior(State)
  *             end
  *     end.
  *
@@ -34,25 +34,51 @@ Definition echo_server_behavior (state : unit) : behavior unit :=
  * それとも意味があるのか微妙だけどステップ数を msec にするとか
  *)
 
-(* サーバに Hello! というメッセージを送り続ける *)
-(* echo_server に送ったとき、ちゃんと Hello! が返ってきたことを確かめるには？ *)
-Definition echo_client_behavior (server : name) : behavior name :=
+(* サーバに ping というメッセージを送る *)
+Definition client_behavior (server_addr : name) : behavior name :=
   receive (fun _ =>
-         me <- self;
-         server ! (tuple_msg (name_msg me) (str_msg "Hello!"));
-         become server
-      ).
+             me <- self;
+             server_addr ! (tuple_msg (name_msg me) (str_msg "ping"));
+             become server_addr
+          ).
 
-Definition echo_init_system : config :=
-  init "echo-system" (
-         server <- new echo_server_behavior with tt; (* サーバーを作る *)
-         client <- new echo_client_behavior with server; (* クライアントを作る *)
-         client ! empty_msg; (* クライアントを走らせる *)
+Definition pingpong_system : config :=
+  init "pingpong" (
+         server <- new server_behavior with tt; (* サーバーを作る *)
+         client1 <- new client_behavior with server; (* クライアントを作る1 *)
+         client2 <- new client_behavior with server; (* クライアントを作る2 *)
+         client1 ! empty_msg; (* クライアントを走らせる1 *)
+         client2 ! empty_msg;
          become done (* それ以降は何もしない *)
        ).
 
 Recursive ActorExtraction empty_behv.
-Recursive ActorExtraction echo_server_behavior.
-Recursive ActorExtraction echo_client_behavior.
-Recursive ActorExtraction echo_init_system.
-ActorExtraction "echo.erl" echo_init_system.
+Recursive ActorExtraction server_behavior.
+Recursive ActorExtraction client_behavior.
+Recursive ActorExtraction pingpong_system.
+ActorExtraction "pingpong.erl" pingpong_system.
+
+Section Verification.
+  Require Import Ssreflect.ssreflect Ssreflect.seq.
+  Require Import Actario.fairness Actario.specification Actario.tactics.
+
+  Definition top := toplevel "pingpong".
+  Theorem receive_client1 :
+    fairness ->
+    eventually_receive pingpong_system (generated 1 top) (str_msg "pong").
+  Proof.
+    unfold_eventually eventually_receive.
+    move=> fairness p p0 is_path.
+    step is_path p0=> p1.
+    step is_path p1=> p2.
+    step is_path p2=> p3.
+    step is_path p3=> p4.
+    step is_path p4.
+    case=> p5.
+    - step is_path p5.
+      case=> p6.
+      - step is_path p6.
+        admit.
+      - admit.
+    - admit.
+  Qed.
