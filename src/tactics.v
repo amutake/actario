@@ -16,7 +16,7 @@ Ltac step_until_stop is_path p0 :=
   let P := fresh "p" in
   try (progress step is_path p0=> P; step_until_stop is_path P).
 
-Ltac finish i p p' :=
+Ltac found i p p' :=
   exists i; eexists; eexists;
          split; last split; [ apply p | apply p' | ];
          (eapply trans_receive || eapply trans_send || eapply trans_new || eapply trans_self);

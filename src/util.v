@@ -180,4 +180,19 @@ Section Seq.
     apply perm_uniq.
   Qed.
 
+  Lemma map_ext_in :
+    forall (A B : Type) (l : seq.seq A) (f g : A -> B), (forall a, In a l -> f a = g a) -> map f l = map g l.
+  Proof.
+    move=> A0 B0 l f g a_in.
+    move: a_in.
+    elim: l=> //.
+    move=> a l IH a_in /=.
+    congr (_ :: _).
+    - apply/a_in.
+        by constructor.
+    - apply IH.
+      move=> a0 in_a.
+      apply a_in.
+        by (constructor 2).
+  Qed.
 End Seq.

@@ -18,15 +18,11 @@ Definition is_transition_path (p : path) : Prop :=
 
 (* this would be removed *)
 Axiom path_perm :
-  forall p p',
+  forall p i c c',
     is_transition_path p ->
-    is_transition_path p' ->
-    (forall i,
-        (p i = None <-> p' i = None) /\
-        (forall c c',
-            (p i = Some c -> p' i = Some c' /\ Permutation c c') /\
-            (p' i = Some c' -> p i = Some c /\ Permutation c c'))) ->
-    p = p'.
+    Permutation c c' ->
+    p i = Some c ->
+    p i = Some c'.
 
 Definition enabled (c : config) (l : label) : Prop :=
   exists c', c ~(l)~> c'.

@@ -42,8 +42,8 @@ ActorExtraction "factorial" factorial_behv.
 (* Verification *)
 
 Section Verification.
-  Require Import Ssreflect.ssreflect Ssreflect.ssrbool Ssreflect.seq Ssreflect.ssrnat.
-  Require Import Actario.auto Actario.specification Actario.tactics.
+  Require Import Ssreflect.ssreflect Ssreflect.ssrbool Ssreflect.seq Ssreflect.eqtype Ssreflect.ssrnat.
+  Require Import Actario.fairness Actario.auto Actario.specification Actario.tactics Actario.util.
 
   Definition initial_actions (n : nat) (parent : name) := (
     x <- new factorial_behv with tt;
@@ -75,7 +75,7 @@ Section Verification.
   Proof.
     unfold_eventually eventually_receive=> p p0 is_path.
     step_until_stop is_path p0.
-    finish 4 p4 p5.
+    found 4 p4 p5.
   Qed.
 
   Theorem receive_3 :
@@ -83,6 +83,438 @@ Section Verification.
   Proof.
     unfold_eventually eventually_receive=> p p0 is_path.
     step_until_stop is_path p0.
-    finish 22 p22 p23.
+    found 22 p22 p23.
+  Qed.
+
+  Theorem receive_n' :
+    forall n,
+      eventually_receive (factorial_system n top) top (nat_msg (fact n)).
+  Proof.
+    move=> n.
+    unfold_eventually eventually_receive=> p p0 is_path.
+    step is_path p0=> p1.
+    step is_path p1; rewrite eq_refl=> p2.
+
+    generalize dependent n.
+    elim.
+    - move=> p0 p1 p2.
+      step_until_stop is_path p2.
+      found 4 p4 p5.
+    - move=> n IH p0 p1 p2.
+      step is_path p2; rewrite eq_refl=> p3.
+      (* p 0 = system n top が帰納法の仮定にあるので証明できない *)
+      (* もしかしたら configuration について帰納法？=> 行ける気がする *)
+      admit.
+  Qed.
+
+  (* initial acc must be 1 *)
+  (* gen_cont_n top 3 1 = [:: {|
+              state_type := ContState;
+              actor_name := generated 2
+                              (generated 0 (toplevel "factorial"));
+              remaining_actions := become
+                                     (val_cust 1
+                                        (generated 1
+                                           (generated 0
+                                              (toplevel "factorial"))));
+              next_num := 0;
+              behv := factorial_cont_behv;
+              queue := [::] |};
+              {|
+              state_type := ContState;
+              actor_name := generated 1
+                              (generated 0 (toplevel "factorial"));
+              remaining_actions := become
+                                     (val_cust 2
+                                        (generated 0
+                                           (generated 0
+                                              (toplevel "factorial"))));
+              next_num := 0;
+              behv := factorial_cont_behv;
+              queue := [::] |};
+              {|
+              state_type := ContState;
+              actor_name := generated 0
+                              (generated 0 (toplevel "factorial"));
+              remaining_actions := become (val_cust 3 top);
+              next_num := 0;
+              behv := factorial_cont_behv;
+              queue := [::] |}]
+   *)
+  Fixpoint gen_cont_n (top : name) (n : nat) (acc : nat) :=
+    match n with
+    | 0 => [::]
+    | S n' => match n' with
+              | 0 => [:: {|
+                          state_type := ContState;
+                          actor_name := generated 0 (generated 0 (toplevel "factorial"));
+                          remaining_actions := become (val_cust acc top);
+                          next_num := 0;
+                          behv := factorial_cont_behv;
+                          queue := [::] |}]
+              | S n'' =>
+                {|
+                  state_type := ContState;
+                  actor_name := generated n' (generated 0 (toplevel "factorial"));
+                  remaining_actions := become (val_cust acc (generated n'' (generated 0 (toplevel "factorial"))));
+                  next_num := 0;
+                  behv := factorial_cont_behv;
+                  queue := [::] |} :: gen_cont_n top n' (S acc)
+              end
+    end.
+
+  Fixpoint gen_done_n (top : name) (n : nat) :=
+    match n with
+    | 0 => [::]
+    | S n' => {|
+                  state_type := ContState;
+                  actor_name := generated n' (generated 0 (toplevel "factorial"));
+                  remaining_actions := become cont_done;
+                  next_num := 0;
+                  behv := factorial_cont_behv;
+                  queue := [::] |} :: gen_done_n top n'
+    end.
+
+  Definition path_break_start p i n
+             cust_st cust_name cust_acts cust_nx cust_behv cust_q
+
+    :=
+    p i = Some
+            [:: {|
+
+  Definition path_break_0 p (i n : nat) ini nx cust rest :=
+      p i = Some
+         [:: {|
+             state_type := initializer_state;
+             actor_name := toplevel "factorial";
+             remaining_actions := become done;
+             next_num := 1;
+             behv := fun st : initializer_state =>
+                     match st with
+                     | start =>
+                         receive
+                           (fun _ : message => initial_actions ini top)
+                     | done => receive (fun _ : message => become done)
+                     end;
+             queue := [::] |},
+             {|
+             state_type := unit;
+             actor_name := generated 0 (toplevel "factorial");
+             remaining_actions := become tt;
+             next_num := nx;
+             behv := factorial_behv;
+             queue := [:: tuple_msg (nat_msg n) (name_msg cust)] |} & rest].
+  Definition path_break_1 p (i n : nat) ini nx cust rest :=
+      p i = Some (
+         [:: {|
+             state_type := initializer_state;
+             actor_name := toplevel "factorial";
+             remaining_actions := become done;
+             next_num := 1;
+             behv := fun st : initializer_state =>
+                     match st with
+                     | start =>
+                         receive
+                           (fun _ : message => initial_actions ini top)
+                     | done => receive (fun _ : message => become done)
+                     end;
+             queue := [::] |},
+             {|
+             state_type := unit;
+             actor_name := generated 0 (toplevel "factorial");
+             remaining_actions := become tt;
+             next_num := nx;
+             behv := factorial_behv;
+             queue := [:: tuple_msg (nat_msg 0) (name_msg cust)] |} & (gen_cont_n top n 1 ++ rest)]).
+  Definition path_break_2 p (i n : nat) ini nx rest :=
+      p i = Some (
+         [:: {|
+             state_type := initializer_state;
+             actor_name := toplevel "factorial";
+             remaining_actions := become done;
+             next_num := 1;
+             behv := fun st : initializer_state =>
+                     match st with
+                     | start =>
+                         receive
+                           (fun _ : message => initial_actions ini top)
+                     | done => receive (fun _ : message => become done)
+                     end;
+             queue := [:: (nat_msg (fact n))] |},
+             {|
+             state_type := unit;
+             actor_name := generated 0 (toplevel "factorial");
+             remaining_actions := become tt;
+             next_num := nx;
+             behv := factorial_behv;
+             queue := [::] |} & (gen_done_n top n ++ rest)]).
+
+  Lemma mult_0 :
+    forall n,
+      n * 0 = 0.
+  Proof.
+    elim=>//.
+  Qed.
+
+  Lemma add_0 : forall n, n + 0 = n. Proof. elim=>//. Qed.
+
+  Lemma fact_trans_0_1 :
+    forall p n i ini nx cust rest,
+      is_transition_path p ->
+      possible_labels rest = [::] ->
+      path_break_0 p i n ini nx cust rest ->
+      path_break_1 p (i + 4 * n) n ini nx cust rest. (* fact 3 -> 14 *)
+  Proof.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  Qed.
+
+  Lemma fact_trans_1_2 :
+    forall p n i rest,
+      path_break_1 p i n rest ->
+      path_break_2 p (i + 2 * n + 2) n rest. (* fact 3 -> 22 *)
+  Proof.
+    admit.
+  Qed.
+
+  Lemma get_done_n_no_labels :
+    forall n,
+      possible_labels (gen_done_n top n) = [::].
+  Proof.
+    elim=>//.
+    move=> n /=.
+    rewrite/possible_labels/=.
+    admit.
+
+  Qed.
+
+  Lemma possible_labels_path_break_2_receive :
+    forall n,
+      possible_labels ([:: {|
+             state_type := initializer_state;
+             actor_name := toplevel "factorial";
+             remaining_actions := become done;
+             next_num := 1;
+             behv := fun st : initializer_state =>
+                     match st with
+                     | start =>
+                         receive
+                           (fun _ : message => initial_actions n top)
+                     | done => receive (fun _ : message => become done)
+                     end;
+             queue := [:: (nat_msg (fact n))] |};
+             {|
+             state_type := unit;
+             actor_name := generated 0 (toplevel "factorial");
+             remaining_actions := become tt;
+             next_num := 0;
+             behv := factorial_behv;
+             queue := [::] |}] ++
+         gen_done_n top n) = [:: (Receive (toplevel "factorial") (nat_msg (fact n)))].
+  Proof.
+    move=> n.
+    rewrite/possible_labels/=.
+    congr (_ :: _).
+    suff H : [seq match a with
+          | {| state_type := state_type; actor_name := me;
+            remaining_actions := new _ _ _ _; next_num := nx |} =>
+              Some (New (generated nx me))
+          | {| state_type := state_type; actor_name := me;
+            remaining_actions := (to) ! msg; _ |} =>
+              if to
+                   \in [:: toplevel "factorial",
+                           generated 0 (toplevel "factorial")
+                         & [seq actor_name i | i <- gen_done_n top n]]
+              then Some (Send me to msg)
+              else None
+          | {| state_type := state_type; actor_name := me;
+            remaining_actions := self _ |} => Some (Self me)
+          | {| state_type := state_type; actor_name := me;
+            remaining_actions := become _; queue := [::] |} => None
+          | {| state_type := state_type; actor_name := me;
+            remaining_actions := become _; queue :=
+            msg :: _ |} => Some (Receive me msg)
+          end | a <- gen_done_n top n] = [seq None | a <- gen_done_n top n].
+    rewrite H {H}.
+    elim: n=>//.
+    apply/map_ext_in.
+    elim: n=>//.
+    move=> n IH a /=.
+    case.
+    - by move=><-.
+    - case: a.
+      move=> st nm acts nx tmpl q.
+      case: acts.
+      + move=> ch_st b c a.
+        clear.
+        elim: n=>//.
+        move=> n IH /=.
+        case.
+        * case=>//.
+        * apply/IH.
+      + move=> n0 m a in_a.
+        exfalso.
+        move: in_a.
+        clear.
+        elim: n=>//.
+        move=> n IH /=.
+        case.
+        * case=>//.
+        * by apply/IH.
+      + move=> a in_a; exfalso; move: in_a; clear; elim: n=>//; move=> n IH /=; case; [ by case=>// | by apply/IH ].
+      + move=> s; elim: q=>//.
+        move=> a l IH' in_a; exfalso; move: in_a; clear; elim: n=>//; move=> n IH /=; case; [ by case=>// | by apply/IH ].
+  Qed.
+
+  Lemma finish :
+    forall n,
+      calc_trans
+        ([:: {|
+              state_type := initializer_state;
+              actor_name := toplevel "factorial";
+              remaining_actions := become done;
+              next_num := 1;
+              behv := fun st : initializer_state =>
+                      match st with
+                      | start =>
+                          receive
+                            (fun _ : message => initial_actions n top)
+                      | done => receive (fun _ : message => become done)
+                      end;
+              queue := [:: nat_msg (fact n)] |};
+              {|
+              state_type := unit;
+              actor_name := generated 0 (toplevel "factorial");
+              remaining_actions := become tt;
+              next_num := 0;
+              behv := factorial_behv;
+              queue := [::] |}] ++ gen_done_n top n)
+        (Receive (toplevel "factorial") (nat_msg (fact n))) =
+        ([:: {|
+              state_type := initializer_state;
+              actor_name := toplevel "factorial";
+              remaining_actions := become done;
+              next_num := 1;
+              behv := fun st : initializer_state =>
+                      match st with
+                      | start =>
+                          receive
+                            (fun _ : message => initial_actions n top)
+                      | done => receive (fun _ : message => become done)
+                      end;
+              queue := [::] |};
+              {|
+              state_type := unit;
+              actor_name := generated 0 (toplevel "factorial");
+              remaining_actions := become tt;
+              next_num := 0;
+              behv := factorial_behv;
+              queue := [::] |}] ++ gen_done_n top n).
+  Proof.
+    move=> n /=.
+    rewrite eq_refl.
+    congr (_ :: _ :: _).
+    elim: n=>//.
+    move=> n IH /=.
+    congr (_ :: _).
+    have H : [seq match a with
+            | {| state_type := st; actor_name := nm; remaining_actions :=
+              new _ _ _ _ |} => a
+            | {| state_type := st; actor_name := nm; remaining_actions :=
+              (_) ! _; _ |} => a
+            | {| state_type := st; actor_name := nm; remaining_actions :=
+              self _ |} => a
+            | {| state_type := st; actor_name := nm; remaining_actions :=
+              become s; next_num := nx; behv := b; queue := [::] |} => a
+            | {| state_type := st; actor_name := nm; remaining_actions :=
+              become s; next_num := nx; behv := b; queue :=
+              hd :: tl |} =>
+                if (nm == toplevel "factorial") &&
+                   (hd == nat_msg (fact n))
+                then
+                 {|
+                 state_type := st;
+                 actor_name := nm;
+                 remaining_actions := interp (b s) hd;
+                 next_num := nx;
+                 behv := b;
+                 queue := tl |}
+                else a
+                  end | a <- gen_done_n top n] =
+               [seq match a with
+        | {| state_type := st; actor_name := nm; remaining_actions := new
+          _ _ _ _ |} => a
+        | {| state_type := st; actor_name := nm; remaining_actions :=
+          (_) ! _; _ |} => a
+        | {| state_type := st; actor_name := nm; remaining_actions := self
+          _ |} => a
+        | {| state_type := st; actor_name := nm; remaining_actions :=
+          become s; next_num := nx; behv := b; queue := [::] |} => a
+        | {| state_type := st; actor_name := nm; remaining_actions :=
+          become s; next_num := nx; behv := b; queue :=
+          hd :: tl |} =>
+            if (nm == toplevel "factorial") &&
+               (hd == nat_msg (n.+1 * fact n))
+            then
+             {|
+             state_type := st;
+             actor_name := nm;
+             remaining_actions := interp (b s) hd;
+             next_num := nx;
+             behv := b;
+             queue := tl |}
+            else a
+        end | a <- gen_done_n top n].
+    apply/map_ext_in.
+    case=> st nm acts nx tmpl q {IH}; case: acts=>//.
+    elim: q=>//.
+    move=> a l IH s contra; exfalso.
+    move: contra; clear.
+    elim: n=>//.
+    move=> n IH /= contra.
+    apply IH; case: contra; done.
+
+    rewrite -H.
+    done.
+  Qed.
+
+  Theorem receive_n :
+    forall n,
+      eventually_receive (factorial_system n top) top (nat_msg (fact n)).
+  Proof.
+    move=> n.
+    unfold_eventually eventually_receive=> p p0 is_path.
+    step is_path p0=> p1.
+    step is_path p1; rewrite eq_refl=> p2.
+    move: fact_trans_0_1.
+    move/(_ p n 2 _ p2)=> pb1.
+    move: fact_trans_1_2.
+    move/(_ p n _ _ pb1).
+    rewrite/path_break_2=> pfin.
+    eexists; eexists; eexists.
+    split; last split.
+    - apply pfin.
+    - move/(_ _ _ _ is_path pfin): trace_path.
+      rewrite cats0 possible_labels_path_break_2_receive.
+      rewrite/any1.
+      apply.
+    - rewrite finish.
+      eapply trans_receive.
+      + apply/Permutation_refl.
+      + rewrite cats0; apply/Permutation_refl.
   Qed.
 End Verification.
