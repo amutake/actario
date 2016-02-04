@@ -175,12 +175,27 @@ Section Verification.
                   queue := [::] |} :: gen_done_n top n'
     end.
 
-  Definition path_break_start p i n
+  Definition path_break_start p (i n : nat)
              cust_st cust_name cust_acts cust_nx cust_behv cust_q
-
-    :=
+             fact_nx rest :=
+    cust_name <> (generated 0 (toplevel "factorial")) /\
+    cust_name \notin [seq actor_name i | i <- rest] /\
     p i = Some
-            [:: {|
+            [::
+             {|
+               state_type := unit;
+               actor_name := generated 0 (toplevel "factorial");
+               remaining_actions := become tt;
+               next_num := fact_nx;
+               behv := factorial_behv;
+               queue := [:: tuple_msg (nat_msg n) (name_msg cust_name)] |},
+             {|
+               state_type := cust_st;
+               actor_name := cust_name;
+               remaining_actions := cust_acts;
+               next_num := cust_nx;
+               behv := cust_behv;
+               queue := cust_q |} & rest].
 
   Definition path_break_0 p (i n : nat) ini nx cust rest :=
       p i = Some
@@ -226,6 +241,30 @@ Section Verification.
              next_num := nx;
              behv := factorial_behv;
              queue := [:: tuple_msg (nat_msg 0) (name_msg cust)] |} & (gen_cont_n top n 1 ++ rest)]).
+
+  Definition path_break_end p (i n : nat)
+             cust_st cust_name cust_acts cust_nx cust_behv
+             fact_nx rest :=
+    cust_name <> (generated 0 (toplevel "factorial")) /\
+    cust_name \notin [seq actor_name i | i <- rest] /\
+    p i = Some
+            [::
+             {|
+               state_type := unit;
+               actor_name := generated 0 (toplevel "factorial");
+               remaining_actions := become tt;
+               next_num := fact_nx;
+               behv := factorial_behv;
+               queue := [::] |},
+             {|
+               state_type := cust_st;
+               actor_name := cust_name;
+               remaining_actions := cust_acts;
+               next_num := cust_nx;
+               behv := cust_behv;
+               queue := [:: (nat_msg (fact n))] |} & rest].
+
+
   Definition path_break_2 p (i n : nat) ini nx rest :=
       p i = Some (
          [:: {|
@@ -259,11 +298,14 @@ Section Verification.
   Lemma add_0 : forall n, n + 0 = n. Proof. elim=>//. Qed.
 
   Lemma fact_trans_0_1 :
-    forall p n i ini nx cust rest,
+    forall p (i n : nat)
+           cust_st cust_name cust_acts cust_nx cust_behv cust_q
+           cust_acts'
+           fact_nx rest rest',
       is_transition_path p ->
       possible_labels rest = [::] ->
-      path_break_0 p i n ini nx cust rest ->
-      path_break_1 p (i + 4 * n) n ini nx cust rest. (* fact 3 -> 14 *)
+      path_break_start p i n cust_st cust_name cust_acts cust_nx cust_behv cust_q fact_nx rest ->
+      path_break_end p (i + 4 * n) n cust_st cust_name cust_acts' cust_nx cust_behv (fact_nx + n) rest'.
   Proof.
 
 

@@ -1,0 +1,266 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<!-- Created by htmlize-1.47 in css mode. -->
+<html>
+  <head>
+    <title>syntax.v</title>
+    <style type="text/css">
+    <!--
+      body {
+        color: #eaeaea;
+        background-color: color-232;
+      }
+      .comment {
+        /* font-lock-comment-face */
+        color: color-245;
+      }
+      .comment-delimiter {
+        /* font-lock-comment-delimiter-face */
+        color: color-245;
+      }
+      .coq-solve-tactics {
+      }
+      .function-name {
+        /* font-lock-function-name-face */
+        color: #daa520;
+      }
+      .keyword {
+        /* font-lock-keyword-face */
+        color: #00bfff;
+      }
+      .proof-tacticals-name {
+      }
+      .proof-tactics-name {
+        /* proof-tactics-name-face */
+        text-decoration: underline;
+      }
+      .string {
+        /* font-lock-string-face */
+        color: #deb887;
+      }
+      .type {
+        /* font-lock-type-face */
+        color: #98f5ff;
+      }
+      .variable-name {
+        /* font-lock-variable-name-face */
+        color: #e7c547;
+      }
+
+      a {
+        color: inherit;
+        background-color: inherit;
+        font: inherit;
+        text-decoration: inherit;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+    -->
+    </style>
+  </head>
+  <body>
+    <pre>
+<span class="keyword">Declare</span> ML <span class="keyword">Module</span> <span class="string">"actor_extraction_plugin"</span>.
+
+<span class="keyword">Set Implicit Arguments</span>.
+<span class="keyword">Unset Strict Implicit</span>.
+
+<span class="keyword">Require Import</span> Coq.Strings.String.
+<span class="keyword">Require Import</span> Ssreflect.ssreflect Ssreflect.eqtype Ssreflect.seq Ssreflect.ssrbool Ssreflect.ssrnat.
+<span class="keyword">Require Import</span> ssrstring.
+
+<span class="keyword">Notation</span> machine_addr := string.
+
+<span class="keyword">Section</span> <span class="function-name">Name</span>.
+  <span class="keyword">Inductive</span> <span class="function-name">name</span> : <span class="type">Set</span> :=
+  | toplevel : machine_addr -&gt; name
+  | generated : nat -&gt; name -&gt; name. <span class="comment-delimiter">(* </span><span class="comment">&#12518;&#12540;&#12470;&#12540;&#12395; generated &#12392;&#12356;&#12358;&#12467;&#12531;&#12473;&#12488;&#12521;&#12463;&#12479;&#12434;&#20351;&#12431;&#12379;&#12383;&#12367;&#12394;&#12356;&#12398;&#12384;&#12369;&#12393;&#12391;&#12365;&#12427;&#65311; </span><span class="comment-delimiter">*)</span>
+
+  <span class="keyword">Fixpoint</span> <span class="function-name">eqname</span> (<span class="variable-name">n1 n2</span> : name) : bool :=
+    <span class="type">match</span> n1, n2 <span class="type">with</span>
+      | toplevel m1, toplevel m2 =&gt; m1 == m2
+      | generated g1 n1, generated g2 n2 =&gt; (g1 == g2) &amp;&amp; eqname n1 n2
+      | _, _ =&gt; false
+    <span class="type">end</span>.
+
+  <span class="keyword">Lemma</span> <span class="function-name">eqnameP</span> : Equality.axiom eqname.
+  <span class="keyword">Proof</span>.
+    <span class="proof-tactics-name">elim</span>=&gt; [m1|g1 n1 IHn] [m2|g2 n2].
+    - <span class="proof-tactics-name">rewrite</span>/=.
+      <span class="coq-solve-tactics">by</span> <span class="proof-tactics-name">apply</span>: (iffP eqP) =&gt; [-&gt;|[]].
+    - <span class="coq-solve-tactics">by</span> <span class="proof-tactics-name">right</span>.
+    - <span class="coq-solve-tactics">by</span> <span class="proof-tactics-name">right</span>.
+    - <span class="proof-tactics-name">simpl</span>.
+      <span class="proof-tactics-name">apply</span>: (iffP andP).
+      + <span class="proof-tactics-name">case</span> =&gt; eqg eqn.
+        <span class="proof-tactics-name">congr</span> (generated _ _).
+        * <span class="coq-solve-tactics">by</span> <span class="proof-tactics-name">move</span>/eqP: eqg.
+        * <span class="proof-tactics-name">move</span>: IHn; <span class="proof-tactics-name">move</span>/(_ n2) =&gt; IHn.
+            <span class="coq-solve-tactics">by</span> <span class="proof-tactics-name">move</span>/IHn: eqn =&gt;&lt;-.
+      + <span class="proof-tactics-name">case</span>=&gt; &lt;- &lt;-.
+        <span class="proof-tactics-name">split</span>.
+        * <span class="proof-tactics-name">apply</span>: eq_refl.
+        * <span class="coq-solve-tactics">by</span> <span class="proof-tactics-name">apply</span> (rwP (IHn n1)).
+  <span class="keyword">Qed</span>.
+
+  Canonical name_eqMixin := EqMixin eqnameP.
+  Canonical name_eqType := <span class="keyword">Eval</span> <span class="proof-tactics-name">hnf</span> <span class="type">in</span> EqType name name_eqMixin.
+<span class="keyword">End</span> <span class="function-name">Name</span>.
+
+<span class="keyword">Section</span> <span class="function-name">Message</span>.
+  <span class="comment-delimiter">(* </span><span class="comment">&#20219;&#24847;&#12398; Set &#12434;&#12513;&#12483;&#12475;&#12540;&#12472;&#12392;&#12375;&#12390;&#36865;&#12427;&#12371;&#12392;&#12364;&#12391;&#12365;&#12427;&#12424;&#12358;&#12395;&#12377;&#12427;&#12394;&#12425;&#12289;message &#12392; name &#12392; actor &#12392; behavior &#12395;&#22411;&#12479;&#12464;&#20184;&#12369;&#12394;&#12356;&#12392;&#12356;&#12369;&#12394;&#12356; (&#12392;&#24605;&#12358;)
+   * Inductive message (A : Set) : Set := wrap : A -&gt; message A. &#12415;&#12383;&#12356;&#12395;&#12290;&#12376;&#12419;&#12394;&#12356;&#12392;&#12497;&#12479;&#12540;&#12531;&#12510;&#12483;&#12481;&#12391;&#12365;&#12394;&#12356;
+   *
+   * Inductive message : Type := wrap : forall A : Set, A -&gt; message.
+   * match msg with
+   *   | wrap nat n =&gt; addr ! wrap (n + 1); become empty_behv
+   *   | _ =&gt; become empty_behv
+   * end
+   *
+   * &#12392;&#12363;&#12391;&#12365;&#12427;&#12363;&#12394;&#65311;&#12392;&#24605;&#12387;&#12383;&#12369;&#12393;&#12391;&#12365;&#12394;&#12363;&#12387;&#12383; (n has type 'nat' but it is expected to have type 'Datatype.nat' &#12392;&#12363;&#35328;&#12431;&#12428;&#12427;&#12290;&#21516;&#12376;&#12394;&#12435;&#12384;&#12369;&#12393; =&gt; nat &#12392;&#12356;&#12358;&#22793;&#25968;&#21517;&#12395;&#12496;&#12452;&#12531;&#12489;&#12373;&#12428;&#12390;&#12427;&#12363;&#12425;&#12363;&#12290;&#12391;&#12418;&#22411;&#12391;&#12497;&#12479;&#12540;&#12531;&#12510;&#12483;&#12481;&#12377;&#12427;&#12371;&#12392;&#12399;&#12391;&#12365;&#12394;&#12356; (&#35201;&#20986;&#20856;) &#12363;&#12425;&#12289;&#12420;&#12387;&#12401;&#12391;&#12365;&#12394;&#12356;)
+   * &#12354;&#12392;&#12479;&#12503;&#12523;&#12434;&#20316;&#12427;&#12420;&#12388;&#12364; Set &#12376;&#12419;&#12394;&#12367;&#12390; Type &#12384;&#12387;&#12383;&#12398;&#12391;&#12513;&#12483;&#12475;&#12540;&#12472;&#12395;&#12391;&#12365;&#12394;&#12363;&#12387;&#12383;
+   *
+   * &#12479;&#12540;&#12466;&#12483;&#12488;&#12434; Erlang &#12395;&#12377;&#12427;&#12394;&#12425;&#12289;Erlang &#12398;&#12503;&#12522;&#12511;&#12486;&#12451;&#12502;&#12434;&#12469;&#12509;&#12540;&#12488;&#12377;&#12427;&#12384;&#12369;&#12391;&#12356;&#12356;&#12363;&#12418;&#12375;&#12428;&#12394;&#12356;&#12290;
+   * atom &#12399; string &#12434;&#12521;&#12483;&#12503;&#12377;&#12427;&#12384;&#12369;&#12391;&#12356;&#12356;&#12290;Extraction &#12398;&#12392;&#12365;&#12395; string &#12434; atom &#12395;&#22793;&#25563;&#12377;&#12427;&#12290;
+   * Inductive atom : Set := mk_atom : string -&gt; atom.
+   </span><span class="comment-delimiter">*)</span>
+
+  <span class="keyword">Inductive</span> <span class="function-name">message</span> : <span class="type">Set</span> :=
+  | empty_msg : message
+  | name_msg : name -&gt; message
+  | str_msg : string -&gt; message
+  | nat_msg : nat -&gt; message
+  | bool_msg : bool -&gt; message
+  | tuple_msg : message -&gt; message -&gt; message.
+
+  <span class="keyword">Fixpoint</span> <span class="function-name">eqmessage</span> (<span class="variable-name">m1 m2</span> : message) : bool :=
+    <span class="type">match</span> m1, m2 <span class="type">with</span>
+      | empty_msg, empty_msg =&gt; true
+      | name_msg n1, name_msg n2 =&gt; n1 == n2
+      | str_msg s1, str_msg s2 =&gt; s1 == s2
+      | nat_msg n1, nat_msg n2 =&gt; n1 == n2
+      | bool_msg b1, bool_msg b2 =&gt; b1 == b2
+      | tuple_msg t11 t12, tuple_msg t21 t22 =&gt;
+        eqmessage t11 t21 &amp;&amp; eqmessage t12 t22
+      | _, _ =&gt; false
+    <span class="type">end</span>.
+
+  <span class="keyword">Lemma</span> <span class="function-name">eqmessageP</span> : Equality.axiom eqmessage.
+  <span class="keyword">Proof</span>.
+    <span class="proof-tactics-name">elim</span>=&gt; [|n1|s1|n1|b1|t11 IHt1 t12 IHt2] [|n2|s2|n2|b2|t21 t22];
+      <span class="proof-tacticals-name">do</span> [ <span class="coq-solve-tactics">by</span> <span class="proof-tactics-name">apply</span>: (iffP eqP) =&gt; [&lt;-|[]] | <span class="coq-solve-tactics">by</span> <span class="proof-tactics-name">constructor</span> | ].
+    <span class="proof-tactics-name">rewrite</span>/=.
+    <span class="proof-tactics-name">apply</span>: (iffP andP).
+    - <span class="proof-tactics-name">case</span>=&gt; eqt1 eqt2.
+      <span class="proof-tactics-name">congr</span> (tuple_msg _ _).
+      + <span class="coq-solve-tactics">by</span> <span class="proof-tactics-name">move</span>/IHt1: eqt1.
+      + <span class="coq-solve-tactics">by</span> <span class="proof-tactics-name">move</span>/IHt2: eqt2.
+    - <span class="proof-tactics-name">case</span>=&gt; &lt;- &lt;-.
+      <span class="proof-tactics-name">split</span>.
+      + <span class="coq-solve-tactics">by</span> <span class="proof-tactics-name">apply</span> (rwP (IHt1 t11)).
+      + <span class="coq-solve-tactics">by</span> <span class="proof-tactics-name">apply</span> (rwP (IHt2 t12)).
+  <span class="keyword">Qed</span>.
+
+  Canonical message_eqMixin := EqMixin eqmessageP.
+  Canonical message_eqType := <span class="keyword">Eval</span> <span class="proof-tactics-name">hnf</span> <span class="type">in</span> EqType message message_eqMixin.
+<span class="keyword">End</span> <span class="function-name">Message</span>.
+
+<span class="keyword">Section</span> <span class="function-name">Action</span>.
+  <span class="comment-delimiter">(* </span><span class="comment">behavior &#12399; become &#12391;&#33258;&#20998;&#12434;&#25351;&#23450;&#12377;&#12427;&#12371;&#12392;&#12364;&#12424;&#12367;&#12354;&#12426;&#12289;Inductive &#12384;&#12392;&#12381;&#12398;&#12424;&#12358;&#12394;&#20877;&#24112;&#12364;&#26360;&#12369;&#12394;&#12367;&#12394;&#12427;&#12398;&#12391;&#12289;CoInductive &#12395;&#12375;&#12390;&#12356;&#12427; </span><span class="comment-delimiter">*)</span>
+  <span class="comment-delimiter">(* </span><span class="comment">CoInductive &#12394;&#12398;&#12391;&#12289;&#28961;&#38480;&#12523;&#12540;&#12503;&#12364;&#26360;&#12369;&#12385;&#12419;&#12358; </span><span class="comment-delimiter">*)</span>
+  <span class="comment-delimiter">(* </span><span class="comment">Inductive actions, CoInductive behavior &#12394;&#27671;&#12364;&#12377;&#12427;&#12369;&#12393;&#12289;&#30456;&#20114;(&#20313;)&#24112;&#32013;&#22411;&#12391;&#12381;&#12358;&#12356;&#12358;&#12398;&#12387;&#12390;&#26360;&#12369;&#12427;(&#27491;&#12375;&#12356;)&#12398;&#65311; </span><span class="comment-delimiter">*)</span>
+  <span class="comment-delimiter">(* </span><span class="comment">CoInductive &#12394;&#12398;&#12391; eqType &#12395;&#12391;&#12365;&#12394;&#12356; (CoFixpoint f : actions -&gt; actions -&gt; bool &#12392;&#12394;&#12427;&#12424;&#12358;&#12394;&#38306;&#25968;&#12434;&#26360;&#12369;&#12394;&#12356;) </span><span class="comment-delimiter">*)</span>
+  <span class="comment-delimiter">(* </span><span class="comment">CoFixpoint actions_example : actions :=
+   *   let behv := beh (fun _ =&gt; actions_example) in
+   *   become behv
+   * &#12392;&#12363;&#12377;&#12427;&#12363;&#12425;&#12289;actions &#12418; CoInductive &#12391;&#33391;&#12373;&#12381;&#12358;
+   </span><span class="comment-delimiter">*)</span>
+  <span class="comment-delimiter">(* </span><span class="comment">use nat as state </span><span class="comment-delimiter">*)</span>
+  <span class="keyword">Inductive</span> <span class="function-name">actions</span> (<span class="variable-name">state</span> : <span class="type">Set</span>) : <span class="type">Type</span> :=
+  | new : <span class="type">forall</span> <span class="variable-name">child_state</span> : <span class="type">Set</span>, (child_state -&gt; behavior child_state) -&gt; child_state -&gt; (name -&gt; actions state) -&gt; actions state <span class="comment-delimiter">(* </span><span class="comment">CPS, initial state is 0 </span><span class="comment-delimiter">*)</span>
+  | send : name -&gt; message -&gt; actions state -&gt; actions state   <span class="comment-delimiter">(* </span><span class="comment">send n m a == n ! m; a </span><span class="comment-delimiter">*)</span>
+  | self : (name -&gt; actions state) -&gt; actions state           <span class="comment-delimiter">(* </span><span class="comment">CPS </span><span class="comment-delimiter">*)</span>
+  | become : state -&gt; actions state                   <span class="comment-delimiter">(* </span><span class="comment">become &#12375;&#12383;&#24460;&#12399;&#12450;&#12463;&#12471;&#12519;&#12531;&#12434;&#21462;&#12428;&#12394;&#12356;&#12290;become &#20197;&#22806;&#12399;&#24460;&#12395; actions &#12364;&#32154;&#12363;&#12394;&#12369;&#12428;&#12400;&#12394;&#12425;&#12394;&#12356;&#12398;&#12391;&#12289;&#27425;&#12398;&#12513;&#12483;&#12475;&#12540;&#12472;&#12434;&#21463;&#12369;&#21462;&#12428;&#12427;&#29366;&#24907;&#12395;&#12394;&#12428;&#12400;&#24517;&#12378; become &#12395;&#12394;&#12427; </span><span class="comment-delimiter">*)</span>
+  <span class="type">with</span> <span class="function-name">behavior</span> (<span class="variable-name">state</span> : <span class="type">Set</span>) : <span class="type">Type</span> :=
+  | receive : (message -&gt; actions state) -&gt; behavior state.
+
+  <span class="keyword">Definition</span> <span class="function-name">behavior_template</span> (<span class="variable-name">state</span> : <span class="type">Set</span>) := state -&gt; behavior state.
+  <span class="keyword">Definition</span> <span class="function-name">interp</span> {<span class="variable-name">state</span> : <span class="type">Set</span>} (<span class="variable-name">b</span> : behavior state) (<span class="variable-name">m</span> : message) : actions state :=
+    <span class="type">match</span> b <span class="type">with</span>
+    | receive f =&gt; f m
+    <span class="type">end</span>.
+  <span class="comment-delimiter">(* </span><span class="comment">eqactions, eqbehavior &#12399;&#23450;&#32681;&#12391;&#12365;&#12394;&#12356;&#12290;(2&#12388;&#12398;&#38306;&#25968;&#12434;&#21463;&#12369;&#21462;&#12387;&#12390; bool &#12434;&#36820;&#12377;&#12424;&#12358;&#12394;&#38306;&#25968;&#12434;&#20316;&#12425;&#12394;&#12369;&#12428;&#12400;&#12356;&#12369;&#12394;&#12356;&#12363;&#12425; (&#21516;&#12376;&#24418;&#12434;&#12375;&#12390;&#12356;&#12427;&#12363;&#12393;&#12358;&#12363;&#12373;&#12360;&#21028;&#23450;&#12375;&#12390;&#12367;&#12428;&#12428;&#12400;&#12381;&#12428;&#12391;&#12356;&#12356;&#12369;&#12393;&#8230;)) </span><span class="comment-delimiter">*)</span>
+
+  <span class="comment-delimiter">(* </span><span class="comment">Lemma "&#12450;&#12463;&#12471;&#12519;&#12531;&#12395;&#32066;&#12431;&#12426;&#12364;&#12354;&#12427;&#12394;&#12425;&#12289;&#12450;&#12463;&#12471;&#12519;&#12531;&#12398;&#26368;&#24460;&#12399; become &#12375;&#12363;&#26469;&#12394;&#12356;"
+   * CoInductive &#12394;&#12398;&#12391; action := send name msg action &#12415;&#12383;&#12356;&#12394;&#12398;&#12364;&#26360;&#12369;&#12427;&#12363;&#12425;&#33258;&#26126;&#12391;&#12399;&#12394;&#12356;&#12435;&#12384;&#12369;&#12393;&#12289;&#12371;&#12428;&#35388;&#26126;&#12391;&#12365;&#12427;&#12398;&#65311;
+   * become = "&#12354;&#12427;&#25391;&#12427;&#33310;&#12356;&#12391;&#12418;&#12387;&#12390;&#12289;&#27425;&#12398;&#12513;&#12483;&#12475;&#12540;&#12472;&#12398;&#24453;&#12385;&#29366;&#24907;&#12395;&#12394;&#12427;" &#12392;&#12356;&#12358;&#24847;&#21619;&#12384;&#12363;&#12425;&#12356;&#12356;&#12398;&#12363;
+   * =&gt; CoInductive &#12391;&#12399;&#12394;&#12367;&#12394;&#12387;&#12383;
+   </span><span class="comment-delimiter">*)</span>
+<span class="keyword">End</span> <span class="function-name">Action</span>.
+
+<span class="keyword">Notation</span> <span class="string">"n '&lt;-' 'new' behv 'with' ini ; cont"</span> := (new behv ini (<span class="type">fun</span> <span class="variable-name">n</span> =&gt; cont)) (<span class="type">at</span> level 0, cont <span class="type">at</span> level 10).
+<span class="keyword">Notation</span> <span class="string">"n '!' m ';' a"</span> := (send n m a) (<span class="type">at</span> level 0, a <span class="type">at</span> level 10).
+<span class="keyword">Notation</span> <span class="string">"me '&lt;-' 'self' ';' cont"</span> := (self (<span class="type">fun</span> <span class="variable-name">me</span> =&gt; cont)) (<span class="type">at</span> level 0, cont <span class="type">at</span> level 10).
+
+<span class="comment-delimiter">(* </span><span class="comment">Build_actor (&#12371;&#12398;&#12450;&#12463;&#12479;&#12540;&#12398;&#21517;&#21069;) (&#12414;&#12384;&#23455;&#34892;&#12375;&#12390;&#12356;&#12394;&#12356;&#12450;&#12463;&#12471;&#12519;&#12531;) (&#29983;&#25104;&#30058;&#21495;) </span><span class="comment-delimiter">*)</span>
+<span class="keyword">Record</span> <span class="function-name">actor</span> := {
+                 <span class="variable-name">state_type</span> : <span class="type">Set</span>;
+                 actor_name : name;
+                 remaining_actions : actions state_type;
+                 next_num : nat;
+                 behv : behavior_template state_type;
+                 queue : seq message
+               }.
+<span class="comment-delimiter">(* </span><span class="comment">behavior &#12399;&#25345;&#12387;&#12390;&#12394;&#12356;&#12290;actions &#12398;&#26368;&#24460;&#12395;&#27425;&#12398; behavior &#12364;&#26469;&#12427;&#12398;&#12392;&#12289;&#12450;&#12463;&#12471;&#12519;&#12531;&#12434;&#12375;&#32066;&#12431;&#12387;&#12383; (&#12388;&#12414;&#12426; become &#12364;&#12391;&#12390;&#12365;&#12383;) &#29366;&#24907;&#12398;&#12450;&#12463;&#12479;&#12540;&#12375;&#12363;&#12513;&#12483;&#12475;&#12540;&#12472;&#12434;&#21463;&#12369;&#21462;&#12428;&#12394;&#12356;&#12398;&#12391;&#12290;&#12391;&#12418;&#12371;&#12428;&#12399;&#12450;&#12463;&#12479;&#12540;&#12392;&#12375;&#12390;&#12393;&#12358;&#12394;&#12398;&#65311;&#22806;&#12363;&#12425;&#12399;&#35211;&#12360;&#12394;&#12356;&#12418;&#12398;&#12384;&#12369;&#12393;&#12290;&#12290; </span><span class="comment-delimiter">*)</span>
+<span class="comment-delimiter">(* </span><span class="comment">&#12354;&#12392;&#12289;&#12464;&#12525;&#12540;&#12496;&#12523;&#12513;&#12483;&#12475;&#12540;&#12472;&#12461;&#12517;&#12540;&#12398;&#20182;&#12395; actor &#12418;&#12513;&#12483;&#12475;&#12540;&#12472;&#12461;&#12517;&#12540;&#12434;&#25345;&#12388;&#12424;&#12358;&#12395;&#12375;&#12383;&#12356;&#12290;&#12464;&#12525;&#12540;&#12496;&#12523;&#12461;&#12517;&#12540;&#12384;&#12369;&#12384;&#12392;&#12289;&#20808;&#38957;&#12398;&#12513;&#12483;&#12475;&#12540;&#12472;&#12398;&#23451;&#20808;&#12398;&#12450;&#12463;&#12479;&#12540;&#12364;&#12356;&#12388;&#12414;&#12391;&#12383;&#12387;&#12390;&#12418;&#20181;&#20107;&#12364;&#32066;&#12431;&#12425;&#12394;&#12356;&#12392;&#12365;&#12289;&#20182;&#12398;&#12450;&#12463;&#12479;&#12540;&#12399;&#12513;&#12483;&#12475;&#12540;&#12472;&#12434;&#21463;&#12369;&#21462;&#12428;&#12394;&#12356; -&gt; configuration &#12398;&#20013;&#12398;&#12513;&#12483;&#12475;&#12540;&#12472;&#12398;&#38918;&#30058;&#12434;&#12394;&#12367;&#12379;&#12400;OK </span><span class="comment-delimiter">*)</span>
+
+<span class="keyword">Definition</span> <span class="function-name">config</span> := seq actor.
+
+<span class="comment-delimiter">(* </span><span class="comment">&#12513;&#12483;&#12475;&#12540;&#12472;&#12434;&#21463;&#12369;&#21462;&#12387;&#12390;&#12418;&#20309;&#12418;&#12375;&#12394;&#12356;&#25391;&#12427;&#33310;&#12356; </span><span class="comment-delimiter">*)</span>
+<span class="keyword">Definition</span> <span class="function-name">empty_behv</span> {<span class="variable-name">state</span> : <span class="type">Set</span>} (<span class="variable-name">st</span> : state) : behavior state := receive (<span class="type">fun</span> <span class="variable-name">_</span> =&gt; become st).
+
+<span class="keyword">Inductive</span> <span class="function-name">initializer_state</span> := start | <span class="coq-solve-tactics">done</span>.
+
+<span class="comment-delimiter">(* </span><span class="comment">&#21021;&#26399;&#29366;&#24907; </span><span class="comment-delimiter">*)</span>
+<span class="comment-delimiter">(* </span><span class="comment">toplevel &#12450;&#12463;&#12479;&#12540;&#19968;&#12388;&#12384;&#12369;&#12399;&#12385;&#12423;&#12387;&#12392;&#24375;&#12377;&#12366;&#12427;&#12363;&#12418;&#12375;&#12428;&#12394;&#12356;&#65311; </span><span class="comment-delimiter">*)</span>
+<span class="keyword">Inductive</span> <span class="function-name">initial_config</span> : config -&gt; <span class="type">Prop</span> :=
+| init_conf : <span class="type">forall</span> <span class="variable-name">machine actions</span>,
+    initial_config ([:: {|
+                         actor_name := toplevel machine;
+                         state_type := initializer_state;
+                         remaining_actions := actions;
+                         next_num := 0;
+                         behv := <span class="type">fun</span> <span class="variable-name">st</span> =&gt; <span class="type">match</span> st <span class="type">with</span>
+                                           | start =&gt; receive (<span class="type">fun</span> <span class="variable-name">_</span> =&gt; actions)
+                                           | <span class="coq-solve-tactics">done</span> =&gt; empty_behv <span class="coq-solve-tactics">done</span>
+                                           <span class="type">end</span>;
+                         queue := [::]
+                       |}]).
+
+<span class="keyword">Hint Constructors</span> initial_config.
+
+<span class="comment-delimiter">(* </span><span class="comment">initial config &#12434;&#20316;&#12427;&#12420;&#12388; </span><span class="comment-delimiter">*)</span>
+<span class="keyword">Definition</span> <span class="function-name">init</span> (<span class="variable-name">sys_name</span> : string) (<span class="variable-name">actions</span> : actions initializer_state) : config :=
+  [::
+     {|
+       actor_name := toplevel sys_name;
+       state_type := initializer_state;
+       remaining_actions := actions;
+       next_num := 0;
+       behv := <span class="type">fun</span> <span class="variable-name">st</span> =&gt; <span class="type">match</span> st <span class="type">with</span>
+                         | start =&gt; receive (<span class="type">fun</span> <span class="variable-name">_</span> =&gt; actions)
+                         | <span class="coq-solve-tactics">done</span> =&gt; receive (<span class="type">fun</span> <span class="variable-name">_</span> =&gt; become <span class="coq-solve-tactics">done</span>)
+                         <span class="type">end</span>;
+       queue := [::]
+     |}].
+
+<span class="keyword">Lemma</span> <span class="function-name">init_is_initial_config</span> :
+  <span class="type">forall</span> <span class="variable-name">sys_name behv</span>,
+    initial_config (init sys_name behv).
+<span class="keyword">Proof</span>.
+  <span class="proof-tactics-name">move</span>=&gt; sys_name behv.
+  <span class="proof-tactics-name">constructor</span>.
+<span class="keyword">Qed</span>.
+</pre>
+  </body>
+</html>
