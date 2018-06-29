@@ -18,10 +18,10 @@ open Globnames
 open Pp
 open CErrors
 open Util
-open Table
-open Extraction
-open Modutil
-open Common
+open Actor_table
+open Actor_extraction
+open Actor_modutil
+open Actor_common
 
 (***************************************)
 (*S Part I: computing Coq environment. *)
@@ -709,7 +709,7 @@ let flatten_structure struc =
 
 let structure_for_compute env sg c =
   init false false ~compute:true;
-  let ast, mlt = Extraction.extract_constr env sg c in
+  let ast, mlt = Actor_extraction.extract_constr env sg c in
   let ast = Mlutil.normalize ast in
   let refs = ref Refset.empty in
   let add_ref r = refs := Refset.add r !refs in

@@ -150,7 +150,7 @@ val file_comment : unit -> string
 
 (*s Target language. *)
 
-type lang = Ocaml | Haskell | Scheme | JSON
+type lang = Ocaml | Haskell | Scheme | Erlang | JSON
 val lang : unit -> lang
 
 (*s Extraction modes: modular or monolithic, library or minimal ?
