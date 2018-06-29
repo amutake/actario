@@ -350,7 +350,7 @@ let rec extract_structure env mp reso ~all = function
 
 and extract_mexpr env mp = function
   | MEwith _ -> assert false (* no 'with' syntax for modules *)
-  | me when lang () != Ocaml || Table.is_extrcompute () ->
+  | me when lang () != Ocaml || Actor_table.is_extrcompute () ->
       (* In Haskell/Scheme, we expand everything.
          For now, we also extract everything, dead code will be removed later
          (see [Modutil.optimize_struct]. *)
@@ -430,10 +430,7 @@ let mono_environment refs mpl =
 (**************************************)
 
 let descr () = match lang () with
-  | Ocaml -> Ocaml.ocaml_descr
-  | Haskell -> Haskell.haskell_descr
-  | Scheme -> Scheme.scheme_descr
-  | JSON -> Json.json_descr
+  | Erlang -> Erlang.erlang_descr
 
 (* From a filename string "foo.ml" or "foo", builds "foo.ml" and "foo.mli"
    Works similarly for the other languages. *)
@@ -451,7 +448,7 @@ let mono_filename f =
 	  else f
 	in
 	let id =
-	  if lang () != Haskell then default_id
+	  if lang () != Haskell && lang () <> Erlang then default_id
 	  else
             try Id.of_string (Filename.basename f)
 	    with UserError _ ->
@@ -519,8 +516,8 @@ let print_structure_to_file (fn,si,mo) dry struc =
   let d = descr () in
   reset_renaming_tables AllButExternal;
   let unsafe_needs = {
-    mldummy = struct_ast_search Mlutil.isMLdummy struc;
-    tdummy = struct_type_search Mlutil.isTdummy struc;
+    mldummy = struct_ast_search Actor_mlutil.isMLdummy struc;
+    tdummy = struct_type_search Actor_mlutil.isTdummy struc;
     tunknown = struct_type_search ((==) Tunknown) struc;
     magic =
       if lang () != Haskell then false
@@ -710,7 +707,7 @@ let flatten_structure struc =
 let structure_for_compute env sg c =
   init false false ~compute:true;
   let ast, mlt = Actor_extraction.extract_constr env sg c in
-  let ast = Mlutil.normalize ast in
+  let ast = Actor_mlutil.normalize ast in
   let refs = ref Refset.empty in
   let add_ref r = refs := Refset.add r !refs in
   let () = ast_iter_references add_ref add_ref add_ref ast in

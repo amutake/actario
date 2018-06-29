@@ -16,9 +16,9 @@ open Namegen
 open Nameops
 open Libnames
 open Globnames
-open Table
+open Actor_table
 open Miniml
-open Mlutil
+open Actor_mlutil
 
 let ascii_of_id id =
   let s = Id.to_string id in
@@ -605,6 +605,7 @@ let pp_global k r =
       | JSON -> dottify (List.map unquote rls)
       | Haskell -> if modular () then pp_haskell_gen k mp rls else s
       | Ocaml -> pp_ocaml_gen k mp rls (Some l)
+      | Erlang -> s
 
 (* The next function is used only in Ocaml extraction...*)
 

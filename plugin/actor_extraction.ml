@@ -25,8 +25,8 @@ open Recordops
 open Namegen
 open Globnames
 open Miniml
-open Table
-open Mlutil
+open Actor_table
+open Actor_mlutil
 open Context.Rel.Declaration
 (*i*)
 

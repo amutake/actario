@@ -61,7 +61,7 @@ END
 
 (* Extraction commands *)
 
-VERNAC COMMAND EXTEND Extraction CLASSIFIED AS QUERY
+VERNAC COMMAND EXTEND ActorExtraction CLASSIFIED AS QUERY
 (* ActorExtraction in the Coq toplevel *)
 | [ "ActorExtraction" global(x) ] -> [ simple_extraction x ]
 | [ "Recursive" "ActorExtraction" ne_global_list(l) ] -> [ full_extraction None l ]
@@ -71,7 +71,7 @@ VERNAC COMMAND EXTEND Extraction CLASSIFIED AS QUERY
   -> [ full_extraction (Some f) l ]
 
 (* Extraction to a temporary file and OCaml compilation *)
-| [ "Extraction" "TestCompile" ne_global_list(l) ]
+| [ "ActorExtraction" "TestCompile" ne_global_list(l) ]
   -> [ extract_and_compile l ]
 END
 

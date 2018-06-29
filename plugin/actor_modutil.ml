@@ -14,8 +14,8 @@ open Globnames
 open CErrors
 open Util
 open Miniml
-open Table
-open Mlutil
+open Actor_table
+open Actor_mlutil
 
 (*S Functions upon ML modules. *)
 
