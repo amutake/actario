@@ -1,17 +1,16 @@
 (************************************************************************)
-(*  v      *   The Coq Proof Assistant  /  The Coq Development Team     *)
-(* <O___,, *   INRIA - CNRS - LIX - LRI - PPS - Copyright 1999-2014     *)
+(*         *   The Coq Proof Assistant / The Coq Development Team       *)
+(*  v      *   INRIA, CNRS and contributors - Copyright 1999-2018       *)
+(* <O___,, *       (see CREDITS file for the list of authors)           *)
 (*   \VV/  **************************************************************)
-(*    //   *      This file is distributed under the terms of the       *)
-(*         *       GNU Lesser General Public License Version 2.1        *)
+(*    //   *    This file is distributed under the terms of the         *)
+(*         *     GNU Lesser General Public License Version 2.1          *)
+(*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
 open Names
-open Declarations
-open Environ
-open Libnames
+open Globnames
 open Miniml
-open Mod_subst
 
 (*s Functions upon ML modules. *)
 
@@ -20,12 +19,16 @@ val struct_type_search : (ml_type -> bool) -> ml_structure -> bool
 
 type do_ref = global_reference -> unit
 
+val type_iter_references : do_ref -> ml_type -> unit
+val ast_iter_references : do_ref -> do_ref -> do_ref -> ml_ast -> unit
 val decl_iter_references : do_ref -> do_ref -> do_ref -> ml_decl -> unit
 val spec_iter_references : do_ref -> do_ref -> do_ref -> ml_spec -> unit
 
 val signature_of_structure : ml_structure -> ml_signature
 
-val msid_of_mt : ml_module_type -> module_path
+val mtyp_of_mexpr : ml_module_expr -> ml_module_type
+
+val msid_of_mt : ml_module_type -> ModPath.t
 
 val get_decl_in_structure : global_reference -> ml_structure -> ml_decl
 
@@ -36,5 +39,5 @@ val get_decl_in_structure : global_reference -> ml_structure -> ml_decl
    optimizations. The first argument is the list of objects we want to appear.
 *)
 
-val optimize_struct : global_reference list * module_path list ->
+val optimize_struct : global_reference list * ModPath.t list ->
   ml_structure -> ml_structure

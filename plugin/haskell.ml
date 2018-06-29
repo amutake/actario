@@ -1,68 +1,99 @@
 (************************************************************************)
-(*  v      *   The Coq Proof Assistant  /  The Coq Development Team     *)
-(* <O___,, *   INRIA - CNRS - LIX - LRI - PPS - Copyright 1999-2014     *)
+(*         *   The Coq Proof Assistant / The Coq Development Team       *)
+(*  v      *   INRIA, CNRS and contributors - Copyright 1999-2018       *)
+(* <O___,, *       (see CREDITS file for the list of authors)           *)
 (*   \VV/  **************************************************************)
-(*    //   *      This file is distributed under the terms of the       *)
-(*         *       GNU Lesser General Public License Version 2.1        *)
+(*    //   *    This file is distributed under the terms of the         *)
+(*         *     GNU Lesser General Public License Version 2.1          *)
+(*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
 (*s Production of Haskell syntax. *)
 
 open Pp
+open CErrors
 open Util
 open Names
-open Nameops
-open Libnames
+open Globnames
 open Table
 open Miniml
 open Mlutil
 open Common
 
 (*s Haskell renaming issues. *)
-
-let pr_lower_id id = str (String.uncapitalize (string_of_id id))
-let pr_upper_id id = str (String.capitalize (string_of_id id))
+[@@@ocaml.warning "-3"]       (* String.(un)capitalize_ascii since 4.03.0 GPR#124 *)
+let pr_lower_id id = str (String.uncapitalize (Id.to_string id))
+let pr_upper_id id = str (String.capitalize (Id.to_string id))
+[@@@ocaml.warning "+3"]
 
 let keywords =
-  List.fold_right (fun s -> Idset.add (id_of_string s))
-  [ "case"; "class"; "data"; "default"; "deriving"; "do"; "else";
+  List.fold_right (fun s -> Id.Set.add (Id.of_string s))
+  [ "Any"; "case"; "class"; "data"; "default"; "deriving"; "do"; "else";
     "if"; "import"; "in"; "infix"; "infixl"; "infixr"; "instance";
     "let"; "module"; "newtype"; "of"; "then"; "type"; "where"; "_"; "__";
     "as"; "qualified"; "hiding" ; "unit" ; "unsafeCoerce" ]
-  Idset.empty
+  Id.Set.empty
 
-let preamble mod_name used_modules usf =
-  let pp_import mp = str ("import qualified "^ string_of_modfile mp ^"\n")
+let pp_comment s = str "-- " ++ s ++ fnl ()
+let pp_bracket_comment s = str"{- " ++ hov 0 s ++ str" -}"
+
+(* Note: do not shorten [str "foo" ++ fnl ()] into [str "foo\n"],
+   the '\n' character interacts badly with the Format boxing mechanism *)
+
+let preamble mod_name comment used_modules usf =
+  let pp_import mp = str ("import qualified "^ string_of_modfile mp) ++ fnl ()
   in
-  (if not usf.magic then mt ()
+  (if not (usf.magic || usf.tunknown) then mt ()
    else
-     str "{-# OPTIONS_GHC -cpp -fglasgow-exts #-}\n" ++
-     str "{- For Hugs, use the option -F\"cpp -P -traditional\" -}\n\n")
+     str "{-# OPTIONS_GHC -cpp -XMagicHash #-}" ++ fnl () ++
+     str "{- For Hugs, use the option -F\"cpp -P -traditional\" -}" ++ fnl2 ())
+  ++
+  (match comment with
+    | None -> mt ()
+    | Some com -> pp_bracket_comment com ++ fnl2 ())
   ++
   str "module " ++ pr_upper_id mod_name ++ str " where" ++ fnl2 () ++
   str "import qualified Prelude" ++ fnl () ++
-  prlist pp_import used_modules ++ fnl () ++
-  (if used_modules = [] then mt () else fnl ()) ++
+  prlist pp_import used_modules ++ fnl ()
+  ++
+  (if not (usf.magic || usf.tunknown) then mt ()
+   else
+     str "#ifdef __GLASGOW_HASKELL__" ++ fnl () ++
+     str "import qualified GHC.Base" ++ fnl () ++
+     str "#else" ++ fnl () ++
+     str "-- HUGS" ++ fnl () ++
+     str "import qualified IOExts" ++ fnl () ++
+     str "#endif" ++ fnl2 ())
+  ++
   (if not usf.magic then mt ()
-   else str "\
-\nunsafeCoerce :: a -> b\
-\n#ifdef __GLASGOW_HASKELL__\
-\nimport qualified GHC.Base\
-\nunsafeCoerce = GHC.Base.unsafeCoerce#\
-\n#else\
-\n-- HUGS\
-\nimport qualified IOExts\
-\nunsafeCoerce = IOExts.unsafeCoerce\
-\n#endif" ++ fnl2 ())
+   else
+     str "#ifdef __GLASGOW_HASKELL__" ++ fnl () ++
+     str "unsafeCoerce :: a -> b" ++ fnl () ++
+     str "unsafeCoerce = GHC.Base.unsafeCoerce#" ++ fnl () ++
+     str "#else" ++ fnl () ++
+     str "-- HUGS" ++ fnl () ++
+     str "unsafeCoerce :: a -> b" ++ fnl () ++
+     str "unsafeCoerce = IOExts.unsafeCoerce" ++ fnl () ++
+     str "#endif" ++ fnl2 ())
+  ++
+  (if not usf.tunknown then mt ()
+   else
+     str "#ifdef __GLASGOW_HASKELL__" ++ fnl () ++
+     str "type Any = GHC.Base.Any" ++ fnl () ++
+     str "#else" ++ fnl () ++
+     str "-- HUGS" ++ fnl () ++
+     str "type Any = ()" ++ fnl () ++
+     str "#endif" ++ fnl2 ())
   ++
   (if not usf.mldummy then mt ()
-   else str "__ :: any" ++ fnl () ++
-        str "__ = Prelude.error \"Logical or arity value used\"" ++ fnl2 ())
+   else
+     str "__ :: any" ++ fnl () ++
+     str "__ = Prelude.error \"Logical or arity value used\"" ++ fnl2 ())
 
 let pp_abst = function
   | [] -> (mt ())
   | l  -> (str "\\" ++
-             prlist_with_sep (fun () -> (str " ")) pr_id l ++
+             prlist_with_sep (fun () -> (str " ")) Id.print l ++
              str " ->" ++ spc ())
 
 (*s The pretty-printer for haskell syntax *)
@@ -74,19 +105,15 @@ let pp_global k r =
 (*s Pretty-printing of types. [par] is a boolean indicating whether parentheses
     are needed or not. *)
 
-let kn_sig =
-  let specif = MPfile (dirpath_of_string "Coq.Init.Specif") in
-  make_mind specif empty_dirpath (mk_label "sig")
-
 let rec pp_type par vl t =
   let rec pp_rec par = function
     | Tmeta _ | Tvar' _ -> assert false
     | Tvar i ->
-      (try pr_id (List.nth vl (pred i))
-       with e when Errors.noncritical e -> (str "a" ++ int i))
+      (try Id.print (List.nth vl (pred i))
+       with Failure _ -> (str "a" ++ int i))
     | Tglob (r,[]) -> pp_global Type r
     | Tglob (IndRef(kn,0),l)
-	when not (keep_singleton ()) && kn = mk_ind "Coq.Init.Specif" "sig" ->
+	when not (keep_singleton ()) && MutInd.equal kn (mk_ind "Coq.Init.Specif" "sig") ->
 	  pp_type true vl (List.hd l)
     | Tglob (r,l) ->
 	  pp_par par
@@ -96,8 +123,8 @@ let rec pp_type par vl t =
 	pp_par par
 	  (pp_rec true t1 ++ spc () ++ str "->" ++ spc () ++ pp_rec false t2)
     | Tdummy _ -> str "()"
-    | Tunknown -> str "()"
-    | Taxiom -> str "() -- AXIOM TO BE REALIZED\n"
+    | Tunknown -> str "Any"
+    | Taxiom -> str "() -- AXIOM TO BE REALIZED" ++ fnl ()
  in
   hov 0 (pp_rec par t)
 
@@ -117,7 +144,11 @@ let rec pp_expr par env args =
   and apply2 st = pp_apply2 st par args in
   function
     | MLrel n ->
-	let id = get_db_name n env in apply (pr_id id)
+	let id = get_db_name n env in
+        (* Try to survive to the occurrence of a Dummy rel.
+           TODO: we should get rid of this hack (cf. BZ#592) *)
+        let id = if Id.equal id dummy_name then Id.of_string "__" else id in
+        apply (Id.print id)
     | MLapp (f,args') ->
 	let stl = List.map (pp_expr true env []) args' in
         pp_expr par env (stl @ args) f
@@ -128,7 +159,7 @@ let rec pp_expr par env args =
 	apply2 st
     | MLletin (id,a1,a2) ->
 	let i,env' = push_vars [id_of_mlid id] env in
-	let pp_id = pr_id (List.hd i)
+	let pp_id = Id.print (List.hd i)
 	and pp_a1 = pp_expr false env [] a1
 	and pp_a2 = pp_expr (not par && expr_needs_par a2) env' [] a2 in
 	let pp_def =
@@ -140,7 +171,7 @@ let rec pp_expr par env args =
     | MLglob r ->
 	apply (pp_global Term r)
     | MLcons (_,r,a) as c ->
-        assert (args=[]);
+        assert (List.is_empty args);
         begin match a with
 	  | _ when is_native_char c -> pp_native_char c
 	  | [] -> pp_global Cons r
@@ -151,13 +182,13 @@ let rec pp_expr par env args =
 			prlist_with_sep spc (pp_expr true env []) a)
 	end
     | MLtuple l ->
-        assert (args=[]);
+        assert (List.is_empty args);
         pp_boxed_tuple (pp_expr true env []) l
     | MLcase (_,t, pv) when is_custom_match pv ->
         if not (is_regular_match pv) then
-	  error "Cannot mix yet user-given match and general patterns.";
+	  user_err Pp.(str "Cannot mix yet user-given match and general patterns.");
 	let mkfun (ids,_,e) =
-	  if ids <> [] then named_lams (List.rev ids) e
+	  if not (List.is_empty ids) then named_lams (List.rev ids) e
 	  else dummy_lams (ast_lift 1 e) 1
 	in
 	let pp_branch tr = pp_expr true env [] (mkfun tr) ++ fnl () in
@@ -177,22 +208,25 @@ let rec pp_expr par env args =
     | MLexn s ->
 	(* An [MLexn] may be applied, but I don't really care. *)
 	pp_par par (str "Prelude.error" ++ spc () ++ qs s)
-    | MLdummy ->
-	str "__" (* An [MLdummy] may be applied, but I don't really care. *)
+    | MLdummy k ->
+        (* An [MLdummy] may be applied, but I don't really care. *)
+        (match msg_of_implicit k with
+         | "" -> str "__"
+         | s -> str "__" ++ spc () ++ pp_bracket_comment (str s))
     | MLmagic a ->
 	pp_apply (str "unsafeCoerce") par (pp_expr true env [] a :: args)
     | MLaxiom -> pp_par par (str "Prelude.error \"AXIOM TO BE REALIZED\"")
 
 and pp_cons_pat par r ppl =
   pp_par par
-    (pp_global Cons r ++ space_if (ppl<>[]) ++ prlist_with_sep spc identity ppl)
+    (pp_global Cons r ++ space_if (not (List.is_empty ppl)) ++ prlist_with_sep spc identity ppl)
 
 and pp_gen_pat par ids env = function
   | Pcons (r,l) -> pp_cons_pat par r (List.map (pp_gen_pat true ids env) l)
-  | Pusual r -> pp_cons_pat par r (List.map pr_id ids)
+  | Pusual r -> pp_cons_pat par r (List.map Id.print ids)
   | Ptuple l -> pp_boxed_tuple (pp_gen_pat false ids env) l
   | Pwild -> str "_"
-  | Prel n -> pr_id (get_db_name n env)
+  | Prel n -> Id.print (get_db_name n env)
 
 and pp_one_pat env (ids,p,t) =
   let ids',env' = push_vars (List.rev_map id_of_mlid ids) env in
@@ -205,7 +239,7 @@ and pp_pat env pv =
   prvecti
     (fun i x ->
        pp_one_pat env pv.(i) ++
-       if i = Array.length pv - 1 then str "}" else
+       if Int.equal i (Array.length pv - 1) then str "}" else
 	 (str ";" ++ fnl ()))
     pv
 
@@ -217,10 +251,10 @@ and pp_fix par env i (ids,bl) args =
     (v 0
        (v 1 (str "let {" ++ fnl () ++
 	     prvect_with_sep (fun () -> str ";" ++ fnl ())
-	       (fun (fi,ti) -> pp_function env (pr_id fi) ti)
-	       (array_map2 (fun a b -> a,b) ids bl) ++
+	       (fun (fi,ti) -> pp_function env (Id.print fi) ti)
+	       (Array.map2 (fun a b -> a,b) ids bl) ++
 	     str "}") ++
-        fnl () ++ str "in " ++ pp_apply (pr_id ids.(i)) false args))
+        fnl () ++ str "in " ++ pp_apply (Id.print ids.(i)) false args))
 
 and pp_function env f t =
   let bl,t' = collect_lams t in
@@ -231,22 +265,20 @@ and pp_function env f t =
 
 (*s Pretty-printing of inductive types declaration. *)
 
-let pp_comment s = str "-- " ++ s ++ fnl ()
-
 let pp_logical_ind packet =
-  pp_comment (pr_id packet.ip_typename ++ str " : logical inductive") ++
+  pp_comment (Id.print packet.ip_typename ++ str " : logical inductive") ++
   pp_comment (str "with constructors : " ++
-	      prvect_with_sep spc pr_id packet.ip_consnames)
+	      prvect_with_sep spc Id.print packet.ip_consnames)
 
 let pp_singleton kn packet =
+  let name = pp_global Type (IndRef (kn,0)) in
   let l = rename_tvars keywords packet.ip_vars in
-  let l' = List.rev l in
-  hov 2 (str "type " ++ pp_global Type (IndRef (kn,0)) ++ spc () ++
-	 prlist_with_sep spc pr_id l ++
-	 (if l <> [] then str " " else mt ()) ++ str "=" ++ spc () ++
-	 pp_type false l' (List.hd packet.ip_types.(0)) ++ fnl () ++
+  hov 2 (str "type " ++ name ++ spc () ++
+	 prlist_with_sep spc Id.print l ++
+	 (if not (List.is_empty l) then str " " else mt ()) ++ str "=" ++ spc () ++
+	 pp_type false l (List.hd packet.ip_types.(0)) ++ fnl () ++
 	 pp_comment (str "singleton inductive, whose constructor was " ++
-		     pr_id packet.ip_consnames.(0)))
+		     Id.print packet.ip_consnames.(0)))
 
 let pp_one_ind ip pl cv =
   let pl = rename_tvars keywords pl in
@@ -258,10 +290,10 @@ let pp_one_ind ip pl cv =
       	       	prlist_with_sep
 		  (fun () -> (str " ")) (pp_type true pl) l))
   in
-  str (if Array.length cv = 0 then "type " else "data ") ++
+  str (if Array.is_empty cv then "type " else "data ") ++
   pp_global Type (IndRef ip) ++
   prlist_strict (fun id -> str " " ++ pr_lower_id id) pl ++ str " =" ++
-  if Array.length cv = 0 then str " () -- empty inductive"
+  if Array.is_empty cv then str " () -- empty inductive"
   else
     (fnl () ++ str " " ++
      v 0 (str "  " ++
@@ -286,7 +318,7 @@ let rec pp_ind first kn i ind =
 (*s Pretty-printing of a declaration. *)
 
 let pp_decl = function
-  | Dind (kn,i) when i.ind_kind = Singleton ->
+  | Dind (kn,i) when i.ind_kind == Singleton ->
       pp_singleton kn i.ind_packets.(0) ++ fnl ()
   | Dind (kn,i) -> hov 0 (pp_ind true kn 0 i)
   | Dtype (r, l, t) ->
@@ -298,8 +330,8 @@ let pp_decl = function
 	    let ids,s = find_type_custom r in
 	    prlist (fun id -> str (id^" ")) ids ++ str "=" ++ spc () ++ str s
 	  with Not_found ->
-	    prlist (fun id -> pr_id id ++ str " ") l ++
-	    if t = Taxiom then str "= () -- AXIOM TO BE REALIZED\n"
+	    prlist (fun id -> Id.print id ++ str " ") l ++
+	    if t == Taxiom then str "= () -- AXIOM TO BE REALIZED" ++ fnl ()
 	    else str "=" ++ spc () ++ pp_type false l t
 	in
 	hov 2 (str "type " ++ pp_global Type r ++ spc () ++ st) ++ fnl2 ()
@@ -310,11 +342,12 @@ let pp_decl = function
       prvecti
 	(fun i r ->
 	  let void = is_inline_custom r ||
-	    (not (is_custom r) && defs.(i) = MLexn "UNUSED")
+	    (not (is_custom r) &&
+             match defs.(i) with MLexn "UNUSED" -> true | _ -> false)
 	  in
 	  if void then mt ()
 	  else
-	    names.(i) ++ str " :: " ++ pp_type false [] typs.(i) ++ fnl () ++
+	    hov 2 (names.(i) ++ str " :: " ++ pp_type false [] typs.(i)) ++ fnl () ++
 	    (if is_custom r then
 		(names.(i) ++ str " = " ++ str (find_custom r))
 	     else
@@ -325,7 +358,7 @@ let pp_decl = function
       if is_inline_custom r then mt ()
       else
 	let e = pp_global Term r in
-	e ++ str " :: " ++ pp_type false [] t ++ fnl () ++
+	hov 2 (e ++ str " :: " ++ pp_type false [] t) ++ fnl () ++
 	  if is_custom r then
 	    hov 0 (e ++ str " = " ++ str (find_custom r) ++ fnl2 ())
 	  else
@@ -342,7 +375,7 @@ and pp_module_expr = function
   | MEfunctor _ -> mt ()
       (* for the moment we simply discard unapplied functors *)
   | MEident _ | MEapply _ -> assert false
-      (* should be expansed in extract_env *)
+      (* should be expanded in extract_env *)
 
 let pp_struct =
   let pp_sel (mp,sel) =
@@ -356,10 +389,11 @@ let pp_struct =
 let haskell_descr = {
   keywords = keywords;
   file_suffix = ".hs";
+  file_naming = string_of_modfile;
   preamble = preamble;
   pp_struct = pp_struct;
   sig_suffix = None;
-  sig_preamble = (fun _ _ _ -> mt ());
+  sig_preamble = (fun _ _ _ _ -> mt ());
   pp_sig = (fun _ -> mt ());
   pp_decl = pp_decl;
 }
