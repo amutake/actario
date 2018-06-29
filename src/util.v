@@ -4,7 +4,7 @@ Unset Strict Implicit.
 Require Import Coq.Lists.List.
 Import ListNotations.
 Require Import Coq.Sorting.Permutation.
-Require Import Ssreflect.ssreflect Ssreflect.ssrbool Ssreflect.eqtype Ssreflect.seq.
+Require Import ssreflect mathcomp.ssreflect.ssrbool mathcomp.ssreflect.eqtype mathcomp.ssreflect.seq.
 
 Section Seq.
 

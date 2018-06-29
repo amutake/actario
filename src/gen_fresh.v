@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import Ssreflect.ssreflect Ssreflect.ssrfun Ssreflect.seq Ssreflect.ssrbool Ssreflect.eqtype Ssreflect.ssrnat.
+Require Import ssreflect mathcomp.ssreflect.ssrfun mathcomp.ssreflect.seq mathcomp.ssreflect.ssrbool mathcomp.ssreflect.eqtype mathcomp.ssreflect.ssrnat.
 Require Import Coq.Program.Equality Coq.Bool.Bool Coq.Sorting.Permutation.
 Require Import util syntax semantics name_dec chain.
 

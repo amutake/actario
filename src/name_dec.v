@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-Require Import Ssreflect.ssreflect Ssreflect.eqtype Ssreflect.seq Ssreflect.ssrbool Ssreflect.ssrnat.
+Require Import ssreflect mathcomp.ssreflect.eqtype mathcomp.ssreflect.seq mathcomp.ssreflect.ssrbool mathcomp.ssreflect.ssrnat.
 Require Import syntax.
 
 Lemma name_not_cycle : forall n g, n <> (generated g n).

@@ -2,7 +2,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 
 Require Import Coq.Sorting.Permutation.
-Require Import Ssreflect.eqtype Ssreflect.ssrbool Ssreflect.seq Ssreflect.ssrnat.
+Require Import mathcomp.ssreflect.eqtype mathcomp.ssreflect.ssrbool mathcomp.ssreflect.seq mathcomp.ssreflect.ssrnat.
 Require Import syntax.
 
 Section Label.
