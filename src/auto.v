@@ -50,7 +50,7 @@ Proof.
   - admit.
   - admit.
   - admit.
-Qed.
+Admitted.
 
 Lemma not_possible_labels_not_possible :
   forall c l,
@@ -59,7 +59,7 @@ Lemma not_possible_labels_not_possible :
       ~ (c ~(l)~> c').
 Proof.
   admit.
-Qed.
+Admitted.
 
 (* 遷移前とラベルから遷移後のものを一つ返す *)
 (* 決定可能になるはず *)
@@ -175,7 +175,7 @@ Theorem calc_trans_sound :
     c ~(l)~> c'.
 Proof.
   admit.
-Qed.
+Admitted.
 
 Theorem possible_labels_can_calc_trans :
   forall c l,
@@ -183,7 +183,7 @@ Theorem possible_labels_can_calc_trans :
     c ~(l)~> calc_trans c l.
 Proof.
   admit.
-Qed.
+Admitted.
 
 Require Coq.Lists.List.
 
@@ -203,4 +203,4 @@ Theorem trace_path :
          (possible_labels c).
 Proof.
   admit.
-Qed.
+Admitted.
