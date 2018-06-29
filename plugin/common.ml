@@ -14,11 +14,10 @@ open Declarations
 open Namegen
 open Nameops
 open Libnames
-open Actor_table
+open Table
 open Miniml
-open Actor_table
-open Actor_mlutil
-open Actor_modutil
+open Mlutil
+open Modutil
 open Mod_subst
 
 let string_of_id id =
@@ -570,7 +569,6 @@ let pp_global k r =
       | Scheme -> unquote s (* no modular Scheme extraction... *)
       | Haskell -> if modular () then pp_haskell_gen k mp rls else s
       | Ocaml -> pp_ocaml_gen k mp rls (Some l)
-      | Erlang -> s
 
 (* The next function is used only in Ocaml extraction...*)
 

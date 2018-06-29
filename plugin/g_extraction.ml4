@@ -16,12 +16,12 @@ open Genarg
 open Pp
 open Names
 open Nameops
-open Actor_table
-open Actor_extract_env
+open Table
+open Extract_env
 
 let pr_mlname _ _ _ s = spc () ++ qs s
 
-ARGUMENT EXTEND actor_mlname
+ARGUMENT EXTEND mlname
   TYPED AS string
   PRINTED BY pr_mlname
 | [ preident(id) ] -> [ id ]
@@ -32,8 +32,8 @@ let pr_int_or_id _ _ _ = function
   | ArgInt i -> int i
   | ArgId id -> pr_id id
 
-ARGUMENT EXTEND actor_int_or_id
-  TYPED AS actor_int_or_id
+ARGUMENT EXTEND int_or_id
+  TYPED AS int_or_id
   PRINTED BY pr_int_or_id
 | [ preident(id) ] -> [ ArgId (id_of_string id) ]
 | [ integer(i) ] -> [ ArgInt i ]
@@ -43,105 +43,106 @@ let pr_language = function
   | Ocaml -> str "Ocaml"
   | Haskell -> str "Haskell"
   | Scheme -> str "Scheme"
-  | Erlang -> str "Erlang"
 
-VERNAC ARGUMENT EXTEND actor_language
+VERNAC ARGUMENT EXTEND language
 PRINTED BY pr_language
-| [ "Erlang" ] -> [ Erlang ]
+| [ "Ocaml" ] -> [ Ocaml ]
+| [ "Haskell" ] -> [ Haskell ]
+| [ "Scheme" ] -> [ Scheme ]
 END
 
 (* Extraction commands *)
 
-VERNAC COMMAND EXTEND ActorExtraction
-(* ActorExtraction in the Coq toplevel *)
-| [ "ActorExtraction" global(x) ] -> [ simple_extraction x ]
-| [ "Recursive" "ActorExtraction" ne_global_list(l) ] -> [ full_extraction None l ]
+VERNAC COMMAND EXTEND Extraction
+(* Extraction in the Coq toplevel *)
+| [ "Extraction" global(x) ] -> [ simple_extraction x ]
+| [ "Recursive" "Extraction" ne_global_list(l) ] -> [ full_extraction None l ]
 
 (* Monolithic extraction to a file *)
-| [ "ActorExtraction" string(f) ne_global_list(l) ]
+| [ "Extraction" string(f) ne_global_list(l) ]
   -> [ full_extraction (Some f) l ]
 END
 
-VERNAC COMMAND EXTEND SeparateActorExtraction
+VERNAC COMMAND EXTEND SeparateExtraction
 (* Same, with content splitted in several files *)
-| [ "Separate" "ActorExtraction" ne_global_list(l) ]
+| [ "Separate" "Extraction" ne_global_list(l) ]
   -> [ separate_extraction l ]
 END
 
 (* Modular extraction (one Coq library = one ML module) *)
-VERNAC COMMAND EXTEND ActorExtractionLibrary
-| [ "ActorExtraction" "Library" ident(m) ]
+VERNAC COMMAND EXTEND ExtractionLibrary
+| [ "Extraction" "Library" ident(m) ]
   -> [ extraction_library false m ]
 END
 
-VERNAC COMMAND EXTEND RecursiveActorExtractionLibrary
-| [ "Recursive" "ActorExtraction" "Library" ident(m) ]
+VERNAC COMMAND EXTEND RecursiveExtractionLibrary
+| [ "Recursive" "Extraction" "Library" ident(m) ]
   -> [ extraction_library true m ]
 END
 
 (* Target Language *)
-VERNAC COMMAND EXTEND ActorExtractionLanguage
-| [ "ActorExtraction" "Language" actor_language(l) ]
+VERNAC COMMAND EXTEND ExtractionLanguage
+| [ "Extraction" "Language" language(l) ]
   -> [ extraction_language l ]
 END
 
-VERNAC COMMAND EXTEND ActorExtractionInline
+VERNAC COMMAND EXTEND ExtractionInline
 (* Custom inlining directives *)
-| [ "ActorExtraction" "Inline" ne_global_list(l) ]
+| [ "Extraction" "Inline" ne_global_list(l) ]
   -> [ extraction_inline true l ]
 END
 
-VERNAC COMMAND EXTEND ActorExtractionNoInline
-| [ "ActorExtraction" "NoInline" ne_global_list(l) ]
+VERNAC COMMAND EXTEND ExtractionNoInline
+| [ "Extraction" "NoInline" ne_global_list(l) ]
   -> [ extraction_inline false l ]
 END
 
-VERNAC COMMAND EXTEND PrintActorExtractionInline
-| [ "Print" "ActorExtraction" "Inline" ]
+VERNAC COMMAND EXTEND PrintExtractionInline
+| [ "Print" "Extraction" "Inline" ]
   -> [ print_extraction_inline () ]
 END
 
-VERNAC COMMAND EXTEND ResetActorExtractionInline
-| [ "Reset" "ActorExtraction" "Inline" ]
+VERNAC COMMAND EXTEND ResetExtractionInline
+| [ "Reset" "Extraction" "Inline" ]
   -> [ reset_extraction_inline () ]
 END
 
-VERNAC COMMAND EXTEND ActorExtractionImplicit
+VERNAC COMMAND EXTEND ExtractionImplicit
 (* Custom implicit arguments of some csts/inds/constructors *)
-| [ "ActorExtraction" "Implicit" global(r) "[" actor_int_or_id_list(l) "]" ]
+| [ "Extraction" "Implicit" global(r) "[" int_or_id_list(l) "]" ]
   -> [ extraction_implicit r l ]
 END
 
-VERNAC COMMAND EXTEND ActorExtractionBlacklist
-(* Force ActorExtraction to not use some filenames *)
-| [ "ActorExtraction" "Blacklist" ne_ident_list(l) ]
+VERNAC COMMAND EXTEND ExtractionBlacklist
+(* Force Extraction to not use some filenames *)
+| [ "Extraction" "Blacklist" ne_ident_list(l) ]
   -> [ extraction_blacklist l ]
 END
 
-VERNAC COMMAND EXTEND PrintActorExtractionBlacklist
-| [ "Print" "ActorExtraction" "Blacklist" ]
+VERNAC COMMAND EXTEND PrintExtractionBlacklist
+| [ "Print" "Extraction" "Blacklist" ]
   -> [ print_extraction_blacklist () ]
 END
 
-VERNAC COMMAND EXTEND ResetActorExtractionBlacklist
-| [ "Reset" "ActorExtraction" "Blacklist" ]
+VERNAC COMMAND EXTEND ResetExtractionBlacklist
+| [ "Reset" "Extraction" "Blacklist" ]
   -> [ reset_extraction_blacklist () ]
 END
 
 
 (* Overriding of a Coq object by an ML one *)
-VERNAC COMMAND EXTEND ActorExtractionConstant
-| [ "ActorExtract" "Constant" global(x) string_list(idl) "=>" actor_mlname(y) ]
+VERNAC COMMAND EXTEND ExtractionConstant
+| [ "Extract" "Constant" global(x) string_list(idl) "=>" mlname(y) ]
   -> [ extract_constant_inline false x idl y ]
 END
 
-VERNAC COMMAND EXTEND ActorExtractionInlinedConstant
-| [ "ActorExtract" "Inlined" "Constant" global(x) "=>" actor_mlname(y) ]
+VERNAC COMMAND EXTEND ExtractionInlinedConstant
+| [ "Extract" "Inlined" "Constant" global(x) "=>" mlname(y) ]
   -> [ extract_constant_inline true x [] y ]
 END
 
-VERNAC COMMAND EXTEND ActorExtractionInductive
-| [ "ActorExtract" "Inductive" global(x) "=>"
-    actor_mlname(id) "[" actor_mlname_list(idl) "]" string_opt(o) ]
+VERNAC COMMAND EXTEND ExtractionInductive
+| [ "Extract" "Inductive" global(x) "=>"
+    mlname(id) "[" mlname_list(idl) "]" string_opt(o) ]
   -> [ extract_inductive x id idl o ]
 END

@@ -13,10 +13,10 @@ open Libnames
 open Pp
 open Util
 open Miniml
-open Actor_table
-open Actor_extraction
-open Actor_modutil
-open Actor_common
+open Table
+open Extraction
+open Modutil
+open Common
 open Mod_subst
 
 (***************************************)
@@ -379,7 +379,6 @@ let descr () = match lang () with
   | Ocaml -> Ocaml.ocaml_descr
   | Haskell -> Haskell.haskell_descr
   | Scheme -> Scheme.scheme_descr
-  | Erlang -> Erlang.erlang_descr
 
 (* From a filename string "foo.ml" or "foo", builds "foo.ml" and "foo.mli"
    Works similarly for the other languages. *)
@@ -397,7 +396,7 @@ let mono_filename f =
 	  else f
 	in
 	let id =
-	  if lang () <> Haskell && lang () <> Erlang then default_id
+	  if lang () <> Haskell then default_id
 	  else
             try id_of_string (Filename.basename f)
 	    with e when Errors.noncritical e ->
@@ -456,7 +455,7 @@ let print_structure_to_file (fn,si,mo) dry struc =
   reset_renaming_tables AllButExternal;
   let unsafe_needs = {
     mldummy = struct_ast_search ((=) MLdummy) struc;
-    tdummy = struct_type_search Actor_mlutil.isDummy struc;
+    tdummy = struct_type_search Mlutil.isDummy struc;
     tunknown = struct_type_search ((=) Tunknown) struc;
     magic =
       if lang () <> Haskell then false

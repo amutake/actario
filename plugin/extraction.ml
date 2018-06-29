@@ -23,8 +23,8 @@ open Summary
 open Libnames
 open Nametab
 open Miniml
-open Actor_table
-open Actor_mlutil
+open Table
+open Mlutil
 (*i*)
 
 exception I of inductive_kind

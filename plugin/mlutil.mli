@@ -11,7 +11,7 @@ open Names
 open Term
 open Libnames
 open Miniml
-open Actor_table
+open Table
 
 (*s Utility functions over ML types with meta. *)
 

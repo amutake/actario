@@ -443,8 +443,8 @@ let my_bool_option name initval =
   let _ = declare_bool_option
     {optsync = true;
      optdepr = false;
-     optname = "ActorExtraction "^name;
-     optkey = ["ActorExtraction"; name];
+     optname = "Extraction "^name;
+     optkey = ["Extraction"; name];
      optread = access;
      optwrite = (:=) flag }
   in
@@ -516,16 +516,16 @@ let optims () = !opt_flag_ref
 let _ = declare_bool_option
 	  {optsync = true;
            optdepr = false;
-	   optname = "ActorExtraction Optimize";
-	   optkey = ["ActorExtraction"; "Optimize"];
+	   optname = "Extraction Optimize";
+	   optkey = ["Extraction"; "Optimize"];
 	   optread = (fun () -> !int_flag_ref <> 0);
 	   optwrite = (fun b -> chg_flag (if b then int_flag_init else 0))}
 
 let _ = declare_int_option
           { optsync = true;
             optdepr = false;
-            optname = "ActorExtraction Flag";
-            optkey = ["ActorExtraction";"Flag"];
+            optname = "Extraction Flag";
+            optkey = ["Extraction";"Flag"];
             optread = (fun _ -> Some !int_flag_ref);
             optwrite = (function
                           | None -> chg_flag 0
@@ -534,19 +534,19 @@ let _ = declare_int_option
 
 (*s Extraction Lang *)
 
-type lang = Ocaml | Haskell | Scheme | Erlang
+type lang = Ocaml | Haskell | Scheme
 
-let lang_ref = ref Erlang
+let lang_ref = ref Ocaml
 
 let lang () = !lang_ref
 
 let extr_lang : lang -> obj =
   declare_object
-    {(default_object "ActorExtraction Lang") with
+    {(default_object "Extraction Lang") with
        cache_function = (fun (_,l) -> lang_ref := l);
        load_function = (fun _ (_,l) -> lang_ref := l)}
 
-let _ = declare_summary "ActorExtraction Lang"
+let _ = declare_summary "Extraction Lang"
 	  { freeze_function = (fun () -> !lang_ref);
 	    unfreeze_function = ((:=) lang_ref);
 	    init_function = (fun () -> lang_ref := Ocaml) }
@@ -574,7 +574,7 @@ let add_inline_entries b l =
 
 let inline_extraction : bool * global_reference list -> obj =
   declare_object
-    {(default_object "ActorExtraction Inline") with
+    {(default_object "Extraction Inline") with
        cache_function = (fun (_,(b,l)) -> add_inline_entries b l);
        load_function = (fun _ (_,(b,l)) -> add_inline_entries b l);
        classify_function = (fun o -> Substitute o);
@@ -584,7 +584,7 @@ let inline_extraction : bool * global_reference list -> obj =
         (fun (s,(b,l)) -> (b,(List.map (fun x -> fst (subst_global s x)) l)))
     }
 
-let _ = declare_summary "ActorExtraction Inline"
+let _ = declare_summary "Extraction Inline"
 	  { freeze_function = (fun () -> !inline_table);
 	    unfreeze_function = ((:=) inline_table);
 	    init_function = (fun () -> inline_table := empty_inline_table) }
@@ -605,11 +605,11 @@ let print_extraction_inline () =
   let (i,n)= !inline_table in
   let i'= Refset'.filter (function ConstRef _ -> true | _ -> false) i in
   msg
-    (str "ActorExtraction Inline:" ++ fnl () ++
+    (str "Extraction Inline:" ++ fnl () ++
      Refset'.fold
        (fun r p ->
 	  (p ++ str "  " ++ safe_pr_long_global r ++ fnl ())) i' (mt ()) ++
-     str "ActorExtraction NoInline:" ++ fnl () ++
+     str "Extraction NoInline:" ++ fnl () ++
      Refset'.fold
        (fun r p ->
 	  (p ++ str "  " ++ safe_pr_long_global r ++ fnl ())) n (mt ()))
@@ -618,7 +618,7 @@ let print_extraction_inline () =
 
 let reset_inline : unit -> obj =
   declare_object
-    {(default_object "Reset ActorExtraction Inline") with
+    {(default_object "Reset Extraction Inline") with
        cache_function = (fun (_,_)-> inline_table :=  empty_inline_table);
        load_function = (fun _ (_,_)-> inline_table :=  empty_inline_table)}
 
@@ -657,14 +657,14 @@ let add_implicits r l =
 
 let implicit_extraction : global_reference * int_or_id list -> obj =
   declare_object
-    {(default_object "ActorExtraction Implicit") with
+    {(default_object "Extraction Implicit") with
        cache_function = (fun (_,(r,l)) -> add_implicits r l);
        load_function = (fun _ (_,(r,l)) -> add_implicits r l);
        classify_function = (fun o -> Substitute o);
        subst_function = (fun (s,(r,l)) -> (fst (subst_global s r), l))
     }
 
-let _ = declare_summary "ActorExtraction Implicit"
+let _ = declare_summary "Extraction Implicit"
 	  { freeze_function = (fun () -> !implicits_table);
 	    unfreeze_function = ((:=) implicits_table);
 	    init_function = (fun () -> implicits_table := Refmap'.empty) }
@@ -717,13 +717,13 @@ let add_blacklist_entries l =
 
 let blacklist_extraction : string list -> obj =
   declare_object
-    {(default_object "ActorExtraction Blacklist") with
+    {(default_object "Extraction Blacklist") with
        cache_function = (fun (_,l) -> add_blacklist_entries l);
        load_function = (fun _ (_,l) -> add_blacklist_entries l);
        subst_function = (fun (_,x) -> x)
     }
 
-let _ = declare_summary "ActorExtraction Blacklist"
+let _ = declare_summary "Extraction Blacklist"
 	  { freeze_function = (fun () -> !blacklist_table);
 	    unfreeze_function = ((:=) blacklist_table);
 	    init_function = (fun () -> blacklist_table := Idset.empty) }
@@ -744,7 +744,7 @@ let print_extraction_blacklist () =
 
 let reset_blacklist : unit -> obj =
   declare_object
-    {(default_object "Reset ActorExtraction Blacklist") with
+    {(default_object "Reset Extraction Blacklist") with
        cache_function = (fun (_,_)-> blacklist_table := Idset.empty);
        load_function = (fun _ (_,_)-> blacklist_table := Idset.empty)}
 
@@ -792,7 +792,7 @@ let find_custom_match pv =
 
 let in_customs : global_reference * string list * string -> obj =
   declare_object
-    {(default_object "ML actor extractions") with
+    {(default_object "ML extractions") with
        cache_function = (fun (_,(r,ids,s)) -> add_custom r ids s);
        load_function = (fun _ (_,(r,ids,s)) -> add_custom r ids s);
        classify_function = (fun o -> Substitute o);
@@ -800,21 +800,21 @@ let in_customs : global_reference * string list * string -> obj =
         (fun (s,(r,ids,str)) -> (fst (subst_global s r), ids, str))
     }
 
-let _ = declare_summary "ML actor extractions"
+let _ = declare_summary "ML extractions"
 	  { freeze_function = (fun () -> !customs);
 	    unfreeze_function = ((:=) customs);
 	    init_function = (fun () -> customs := Refmap'.empty) }
 
 let in_custom_matchs : global_reference * string -> obj =
   declare_object
-    {(default_object "ML actor extractions custom matchs") with
+    {(default_object "ML extractions custom matchs") with
        cache_function = (fun (_,(r,s)) -> add_custom_match r s);
        load_function = (fun _ (_,(r,s)) -> add_custom_match r s);
        classify_function = (fun o -> Substitute o);
        subst_function = (fun (subs,(r,s)) -> (fst (subst_global subs r), s))
     }
 
-let _ = declare_summary "ML actor extractions custom match"
+let _ = declare_summary "ML extractions custom match"
 	  { freeze_function = (fun () -> !custom_matchs);
 	    unfreeze_function = ((:=) custom_matchs);
 	    init_function = (fun () -> custom_matchs := Refmap'.empty) }
