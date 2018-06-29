@@ -16,7 +16,7 @@ plugin/erlang.mli
 plugin/actor_extract_env.ml
 plugin/actor_extract_env.mli
 plugin/g_actor_extraction.ml4
-plugin/actor_extraction_plugin.mllib
+plugin/actor_extraction_plugin.mlpack
 
 # basic
 src/ssrascii.v
