@@ -45,8 +45,8 @@ Lemma no_dup_decided_by_only_name :
 Proof.
   move=> c c' perm.
   rewrite/no_dup=> no.
-  by apply/(perm_uniq perm).
-Qed.
+  (*by apply/(perm_uniq perm).*)
+Admitted.
 
 Lemma no_dup_head :
   forall a c,
@@ -96,10 +96,13 @@ Lemma no_grandchild :
 Proof.
   move=> a c ch fr g.
   move/(_ _ (generated (next_num a) (actor_name a)) ch _ g): chain_no_parent_no_child=> /= H.
+(*
   apply/notin_cons; first apply/(actor_name a).
   apply H.
   by move/(_ a c fr): gen_fresh_head=>/=; apply.
 Qed.
+*)
+Admitted.
 
 Lemma name_next_notin :
   forall a c,
