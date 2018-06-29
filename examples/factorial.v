@@ -42,7 +42,7 @@ ActorExtraction "factorial" factorial_behv.
 (* Verification *)
 
 Section Verification.
-  Require Import Ssreflect.ssreflect Ssreflect.ssrbool Ssreflect.seq Ssreflect.ssrnat.
+  Require Import mathcomp.ssreflect.ssreflect mathcomp.ssreflect.ssrbool mathcomp.ssreflect.seq mathcomp.ssreflect.ssrnat.
   Require Import Actario.auto Actario.specification Actario.tactics.
 
   Definition initial_actions (n : nat) (parent : name) := (
