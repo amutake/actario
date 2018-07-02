@@ -13,8 +13,8 @@ Actario = Actor + Scenario
 Requirements
 ------------
 
-- Coq 8.4pl6
-- SSReflect 1.5
+- coq-8.8
+- mathcomp-1.7
 
 Install
 -------
