@@ -1,15 +1,15 @@
 (************************************************************************)
-(*  v      *   The Coq Proof Assistant  /  The Coq Development Team     *)
-(* <O___,, *   INRIA - CNRS - LIX - LRI - PPS - Copyright 1999-2014     *)
+(*         *   The Coq Proof Assistant / The Coq Development Team       *)
+(*  v      *   INRIA, CNRS and contributors - Copyright 1999-2018       *)
+(* <O___,, *       (see CREDITS file for the list of authors)           *)
 (*   \VV/  **************************************************************)
-(*    //   *      This file is distributed under the terms of the       *)
-(*         *       GNU Lesser General Public License Version 2.1        *)
+(*    //   *    This file is distributed under the terms of the         *)
+(*         *     GNU Lesser General Public License Version 2.1          *)
+(*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-open Util
 open Names
-open Term
-open Libnames
+open Globnames
 open Miniml
 open Actor_table
 
@@ -50,7 +50,7 @@ end
 
 (*s Utility functions over ML types without meta *)
 
-val type_mem_kn : mutual_inductive -> ml_type -> bool
+val type_mem_kn : MutInd.t -> ml_type -> bool
 
 val type_maxvar : ml_type -> int
 
@@ -68,7 +68,9 @@ val type_to_signature : abbrev_map -> ml_type -> signature
 val type_expunge : abbrev_map -> ml_type -> ml_type
 val type_expunge_from_sign : abbrev_map -> signature -> ml_type -> ml_type
 
-val isDummy : ml_type -> bool
+val eq_ml_type : ml_type -> ml_type -> bool
+val isTdummy : ml_type -> bool
+val isMLdummy : ml_ast -> bool
 val isKill : sign -> bool
 
 val case_expunge : signature -> ml_ast -> ml_ident list * ml_ast
@@ -78,10 +80,10 @@ val term_expunge : signature -> ml_ident list * ml_ast -> ml_ast
 (*s Special identifiers. [dummy_name] is to be used for dead code
     and will be printed as [_] in concrete (Caml) code. *)
 
-val anonymous_name : identifier
-val dummy_name : identifier
-val id_of_name : name -> identifier
-val id_of_mlid : ml_ident -> identifier
+val anonymous_name : Id.t
+val dummy_name : Id.t
+val id_of_name : Name.t -> Id.t
+val id_of_mlid : ml_ident -> Id.t
 val tmp_id : ml_ident -> ml_ident
 
 (*s [collect_lambda MLlam(id1,...MLlam(idn,t)...)] returns
@@ -111,6 +113,8 @@ val ast_subst : ml_ast -> ml_ast -> ml_ast
 
 val ast_glob_subst : ml_ast Refmap'.t -> ml_ast -> ml_ast
 
+val dump_unused_vars : ml_ast -> ml_ast
+
 val normalize : ml_ast -> ml_ast
 val optimize_fix : ml_ast -> ml_ast
 val inline : global_reference -> ml_ast -> bool
@@ -126,8 +130,8 @@ exception Impossible
 type sign_kind =
   | EmptySig
   | NonLogicalSig (* at least a [Keep] *)
-  | UnsafeLogicalSig (* No [Keep], at least a [Kill Kother] *)
   | SafeLogicalSig (* only [Kill Ktype] *)
+  | UnsafeLogicalSig (* No [Keep], not all [Kill Ktype] *)
 
 val sign_kind : signature -> sign_kind
 

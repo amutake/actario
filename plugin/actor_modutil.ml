@@ -1,27 +1,33 @@
 (************************************************************************)
-(*  v      *   The Coq Proof Assistant  /  The Coq Development Team     *)
-(* <O___,, *   INRIA - CNRS - LIX - LRI - PPS - Copyright 1999-2014     *)
+(*         *   The Coq Proof Assistant / The Coq Development Team       *)
+(*  v      *   INRIA, CNRS and contributors - Copyright 1999-2018       *)
+(* <O___,, *       (see CREDITS file for the list of authors)           *)
 (*   \VV/  **************************************************************)
-(*    //   *      This file is distributed under the terms of the       *)
-(*         *       GNU Lesser General Public License Version 2.1        *)
+(*    //   *    This file is distributed under the terms of the         *)
+(*         *     GNU Lesser General Public License Version 2.1          *)
+(*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
 open Names
-open Declarations
-open Environ
-open Libnames
+open ModPath
+open Globnames
+open CErrors
 open Util
 open Miniml
 open Actor_table
 open Actor_mlutil
-open Mod_subst
 
 (*S Functions upon ML modules. *)
 
+(** Note: a syntax like [(F M) with ...] is actually legal, see for instance
+    bug #4720. Hence the code below tries to handle [MTsig], maybe not in
+    a perfect way, but that should be enough for the use of [se_iter] below. *)
+
 let rec msid_of_mt = function
   | MTident mp -> mp
+  | MTsig(mp,_) -> mp
   | MTwith(mt,_)-> msid_of_mt mt
-  | _ -> anomaly "Extraction:the With operator isn't applied to a name"
+  | MTfunsig _ -> assert false (* A functor cannot be inside a MTwith *)
 
 (*s Apply some functions upon all [ml_decl] and [ml_spec] found in a
    [ml_structure]. *)
@@ -32,16 +38,16 @@ let se_iter do_decl do_spec do_mp =
     | MTfunsig (_,mt,mt') -> mt_iter mt; mt_iter mt'
     | MTwith (mt,ML_With_type(idl,l,t))->
 	let mp_mt = msid_of_mt mt in
-	let l',idl' = list_sep_last idl in
+	let l',idl' = List.sep_last idl in
 	let mp_w =
-	  List.fold_left (fun mp l -> MPdot(mp,label_of_id l)) mp_mt idl'
+	  List.fold_left (fun mp l -> MPdot(mp,Label.of_id l)) mp_mt idl'
 	in
-	let r = ConstRef (make_con mp_w empty_dirpath (label_of_id l')) in
-	mt_iter mt; do_decl (Dtype(r,l,t))
+	let r = ConstRef (Constant.make2 mp_w (Label.of_id l')) in
+        mt_iter mt; do_spec (Stype(r,l,Some t))
     | MTwith (mt,ML_With_module(idl,mp))->
         let mp_mt = msid_of_mt mt in
         let mp_w =
-	  List.fold_left (fun mp l -> MPdot(mp,label_of_id l)) mp_mt idl
+	  List.fold_left (fun mp l -> MPdot(mp,Label.of_id l)) mp_mt idl
 	in
 	mt_iter mt; do_mp mp_w; do_mp mp
     | MTsig (_, sign) -> List.iter spec_iter sign
@@ -102,7 +108,7 @@ let ast_iter_references do_term do_cons do_type a =
 	Array.iter (fun (_,p,_) -> patt_iter_references do_cons p) v
 
       | MLrel _ | MLlam _ | MLapp _ | MLletin _ | MLtuple _ | MLfix _ | MLexn _
-      | MLdummy | MLaxiom | MLmagic _ -> ()
+      | MLdummy _ | MLaxiom | MLmagic _ -> ()
   in iter a
 
 let ind_iter_references do_term do_cons do_type kn ind =
@@ -110,13 +116,13 @@ let ind_iter_references do_term do_cons do_type kn ind =
   let cons_iter cp l = do_cons (ConstructRef cp); List.iter type_iter l in
   let packet_iter ip p =
     do_type (IndRef ip);
-    if lang () = Ocaml then
+    if lang () == Ocaml then
       (match ind.ind_equiv with
-	 | Miniml.Equiv kne -> do_type (IndRef (mind_of_kn kne, snd ip));
+	 | Miniml.Equiv kne -> do_type (IndRef (MutInd.make1 kne, snd ip));
 	 | _ -> ());
     Array.iteri (fun j -> cons_iter (ip,j+1)) p.ip_types
   in
-  if lang () = Ocaml then record_iter_references do_term ind.ind_kind;
+  if lang () == Ocaml then record_iter_references do_term ind.ind_kind;
     Array.iteri (fun i -> packet_iter (kn,i)) ind.ind_packets
 
 let decl_iter_references do_term do_cons do_type =
@@ -199,6 +205,11 @@ let rec msig_of_ms = function
 let signature_of_structure s =
   List.map (fun (mp,ms) -> mp,msig_of_ms ms) s
 
+let rec mtyp_of_mexpr = function
+  | MEfunctor (id,ty,e) -> MTfunsig (id,ty, mtyp_of_mexpr e)
+  | MEstruct (mp,str) -> MTsig (mp, msig_of_ms str)
+  | _ -> assert false
+
 
 (*s Searching one [ml_decl] in a [ml_structure] by its [global_reference] *)
 
@@ -208,18 +219,18 @@ let is_modular = function
 
 let rec search_structure l m = function
   | [] -> raise Not_found
-  | (lab,d)::_ when lab=l && is_modular d = m -> d
+  | (lab,d)::_ when Label.equal lab l && (is_modular d : bool) == m -> d
   | _::fields -> search_structure l m fields
 
 let get_decl_in_structure r struc =
   try
     let base_mp,ll = labels_of_ref r in
     if not (at_toplevel base_mp) then error_not_visible r;
-    let sel = List.assoc base_mp struc in
+    let sel = List.assoc_f ModPath.equal base_mp struc in
     let rec go ll sel = match ll with
       | [] -> assert false
       | l :: ll ->
-	  match search_structure l (ll<>[]) sel with
+	  match search_structure l (not (List.is_empty ll)) sel with
 	    | SEdecl d -> d
 	    | SEmodtype m -> assert false
 	    | SEmodule m ->
@@ -228,7 +239,7 @@ let get_decl_in_structure r struc =
 		  | _ -> error_not_visible r
     in go ll sel
   with Not_found ->
-    anomaly "reference not found in extracted structure"
+    anomaly (Pp.str "reference not found in extracted structure.")
 
 
 (*s Optimization of a [ml_structure]. *)
@@ -251,7 +262,7 @@ let dfix_to_mlfix rv av i =
 	(try MLrel (n + (Refmap'.find refe s)) with Not_found -> t)
     | _ -> ast_map_lift subst n t
   in
-  let ids = Array.map (fun r -> id_of_label (label_of_r r)) rv in
+  let ids = Array.map (fun r -> Label.to_id (label_of_r r)) rv in
   let c = Array.map (subst 0) av
   in MLfix(i, ids, c)
 
@@ -266,7 +277,7 @@ let rec optim_se top to_appear s = function
       let a = normalize (ast_glob_subst !s a) in
       let i = inline r a in
       if i then s := Refmap'.add r a !s;
-      let d = match optimize_fix a with
+      let d = match dump_unused_vars (optimize_fix a) with
 	| MLfix (0, _, [|c|]) ->
 	  Dfix ([|r|], [|ast_subst (MLglob r) c|], [|t|])
 	| a -> Dterm (r, a, t)
@@ -280,7 +291,8 @@ let rec optim_se top to_appear s = function
 	if inline rv.(i) fake_body
 	then s := Refmap'.add rv.(i) (dfix_to_mlfix rv av i) !s
       done;
-      (l,SEdecl (Dfix (rv, av, tv))) :: (optim_se top to_appear s lse)
+      let av' = Array.map dump_unused_vars av in
+      (l,SEdecl (Dfix (rv, av', tv))) :: (optim_se top to_appear s lse)
   | (l,SEmodule m) :: lse ->
       let m = { m with ml_mod_expr = optim_me to_appear s m.ml_mod_expr}
       in (l,SEmodule m) :: (optim_se top to_appear s lse)
@@ -297,8 +309,6 @@ and optim_me to_appear s = function
    For non-library extraction, we recompute a minimal set of dependencies
    for first-level definitions (no module pruning yet). *)
 
-exception NoDepCheck
-
 let base_r = function
   | ConstRef c as r -> r
   | IndRef (kn,_) -> IndRef (kn,0)
@@ -308,7 +318,7 @@ let base_r = function
 let reset_needed, add_needed, add_needed_mp, found_needed, is_needed =
   let needed = ref Refset'.empty
   and needed_mps = ref MPset.empty in
-  ((fun l -> needed := Refset'.empty; needed_mps := MPset.empty),
+  ((fun () -> needed := Refset'.empty; needed_mps := MPset.empty),
    (fun r -> needed := Refset'.add (base_r r) !needed),
    (fun mp -> needed_mps := MPset.add mp !needed_mps),
    (fun r -> needed := Refset'.remove (base_r r) !needed),
@@ -353,7 +363,7 @@ let rec depcheck_se = function
     let se' = depcheck_se se in
     let refs = declared_refs d in
     let refs' = List.filter is_needed refs in
-    if refs' = [] then
+    if List.is_empty refs' then
       (List.iter remove_info_axiom refs;
        List.iter remove_opaque refs;
        se')
@@ -362,7 +372,7 @@ let rec depcheck_se = function
       (* Hack to avoid extracting unused part of a Dfix *)
       match d with
 	| Dfix (rv,trms,tys) when (List.for_all is_custom refs') ->
-	  let trms' =  Array.create (Array.length rv) (MLexn "UNUSED") in
+	  let trms' =  Array.make (Array.length rv) (MLexn "UNUSED") in
 	  ((l,SEdecl (Dfix (rv,trms',tys))) :: se')
 	| _ -> (compute_deps_decl d; t::se')
     end
@@ -376,18 +386,17 @@ let rec depcheck_struct = function
   | (mp,lse)::struc ->
       let struc' = depcheck_struct struc in
       let lse' = depcheck_se lse in
-      if lse' = [] then struc' else (mp,lse')::struc'
+      if List.is_empty lse' then struc' else (mp,lse')::struc'
 
-let check_implicits = function
-  | MLexn s ->
-      if String.length s > 8 && (s.[0] = 'U' || s.[0] = 'I') then
-	begin
-	  if String.sub s 0 7 = "UNBOUND" then assert false;
-	  if String.sub s 0 8 = "IMPLICIT" then
-	    error_non_implicit (String.sub s 9 (String.length s - 9));
-	end;
-      false
-  | _ -> false
+exception RemainingImplicit of kill_reason
+
+let check_for_remaining_implicits struc =
+  let check = function
+    | MLdummy (Kimplicit _ as k) -> raise (RemainingImplicit k)
+    | _ -> false
+  in
+  try ignore (struct_ast_search check struc)
+  with RemainingImplicit k -> err_or_warn_remaining_implicit k
 
 let optimize_struct to_appear struc =
   let subst = ref (Refmap'.empty : ml_ast Refmap'.t) in
@@ -395,12 +404,16 @@ let optimize_struct to_appear struc =
     List.map (fun (mp,lse) -> (mp, optim_se true (fst to_appear) subst lse))
       struc
   in
-  ignore (struct_ast_search check_implicits opt_struc);
-  if library () then
-    List.filter (fun (_,lse) -> lse<>[]) opt_struc
-  else begin
-    reset_needed ();
-    List.iter add_needed (fst to_appear);
-    List.iter add_needed_mp (snd to_appear);
-    depcheck_struct opt_struc
-  end
+  let mini_struc =
+    if library () then
+      List.filter (fun (_,lse) -> not (List.is_empty lse)) opt_struc
+    else
+      begin
+        reset_needed ();
+        List.iter add_needed (fst to_appear);
+        List.iter add_needed_mp (snd to_appear);
+        depcheck_struct opt_struc
+      end
+  in
+  let () = check_for_remaining_implicits mini_struc in
+  mini_struc

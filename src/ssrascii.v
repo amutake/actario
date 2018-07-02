@@ -2,7 +2,9 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 
 Require Import Coq.Strings.Ascii.
-Require Import Ssreflect.ssreflect Ssreflect.eqtype Ssreflect.ssrbool.
+Require Import ssreflect.
+
+Require Import mathcomp.ssreflect.eqtype mathcomp.ssreflect.ssrbool.
 
 Section EqAscii.
   Definition eqascii (a a' : ascii) : bool :=

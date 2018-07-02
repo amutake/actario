@@ -90,7 +90,7 @@ let pp_erl_decl = function
 
 (* AST Converters *)
 
-let array_zip xs ys = array_map2 (fun x y -> x, y) xs ys
+let array_zip xs ys = Array.map2 (fun x y -> x, y) xs ys
 let map_id args = List.map id_of_mlid args
 
 let keywords =
@@ -251,14 +251,14 @@ and conv_expr fname zero env = function
      (* pr_id ids.(i)              (\* <- ??? *\) *)
   | MLexn s ->                  (* 例外 *)
      ErlThrow (ErlString s)
-  | MLdummy -> ErlAtom (MkAtom "__")         (* ??? *)
+  | MLdummy k -> ErlAtom (MkAtom "__")         (* ??? *)
   | MLaxiom -> ErlThrow (ErlString "axiom")
   | MLmagic a -> conv_expr fname true env a  (* erlang に magic に対応するものってあんの *)
 
 (* preamble : identifier -> module_path list -> unsafe_needs -> std_ppcmds *)
 (* preamble で -export([Function1/Arity1,..,FunctionN/ArityN]) を出力したいが、関数名の情報は入力に含まれないので、モジュール名だけ出力する *)
 (* preamble の入力に関数名と引数の数が含まれるようなものを渡すように改造したほうがいいかもしれない *)
-let preamble mod_name used_modules usf =
+let preamble mod_name comment used_modules usf =
   str "-module(" ++ str (String.uncapitalize (string_of_id mod_name)) ++ str ")." ++ fnl ()
 
 (* haskell.ml の pp_function とほぼおなじ *)
@@ -354,10 +354,11 @@ let pp_struct st =
 let erlang_descr = {
   keywords = keywords;
   file_suffix = ".erl";
+  file_naming = Actor_table.file_of_modfile;
   preamble = preamble;
   pp_struct = pp_struct;
   sig_suffix = None;
-  sig_preamble = (fun _ _ _ -> mt ());
+  sig_preamble = (fun _ _ _ _ -> mt ());
   pp_sig = (fun _ -> mt ());
   pp_decl = pp_decl;
 }

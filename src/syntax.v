@@ -4,7 +4,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 
 Require Import Coq.Strings.String.
-Require Import Ssreflect.ssreflect Ssreflect.eqtype Ssreflect.seq Ssreflect.ssrbool Ssreflect.ssrnat.
+Require Import ssreflect mathcomp.ssreflect.eqtype mathcomp.ssreflect.seq mathcomp.ssreflect.ssrbool mathcomp.ssreflect.ssrnat.
 Require Import ssrstring.
 
 Notation machine_addr := string.

@@ -2,7 +2,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 
 Require Import Coq.Strings.String.
-Require Import Ssreflect.ssreflect Ssreflect.eqtype Ssreflect.ssrbool.
+Require Import ssreflect mathcomp.ssreflect.eqtype mathcomp.ssreflect.ssrbool.
 Require Import ssrascii.
 
 Section EqString.
